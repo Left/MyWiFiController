@@ -5,3 +5,7 @@
 
 #define __countof(x) (sizeof(x)/sizeof(x[0]))
 
+
+// Stringify defines
+#define __TO_STR2(x) #x
+#define TO_STR(x) __TO_STR2(x)

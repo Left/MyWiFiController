@@ -205,8 +205,6 @@ SoftwareSerial* dfplayerSerial = NULL; // RX, TX
 const int NUMPIXELS = 64;
 Adafruit_NeoPixel* stripe = NULL;
 
-#define ULONG_MAX 0xffffffff
-
 const long interval = 1000; // Request each second
 unsigned long nextRequest = millis();
 unsigned long nextRead = ULONG_MAX;
@@ -350,7 +348,7 @@ public:
 
   void init() {
     const int pins[] = { pinA, pinB, pinButton };
-    for (int i = 0; i < __countof(pins); ++i) {
+    for (size_t i = 0; i < __countof(pins); ++i) {
       pinMode(pins[i], INPUT_PULLUP);
       attachInterrupt(digitalPinToInterrupt(pins[i]), pinChange, CHANGE);
     }
@@ -483,7 +481,7 @@ void setup() {
       return ledStripe;
     }
 
-    int restartReportedAt = 0;
+    uint32_t restartReportedAt = 0;
 
     virtual void reboot() {
       if (restartAt - millis() >= 200) { 
@@ -605,7 +603,7 @@ void setup() {
 
   if (sceleton::hasEncoders._value == "true") {
   // if (false) {
-    for (int i=0; i < __countof(encoders); ++i) {
+    for (size_t i=0; i < __countof(encoders); ++i) {
       encoders[i].init();
     }
 
@@ -617,20 +615,13 @@ void setup() {
   }
 
   if (sceleton::hasSolidStateRelay._value == "true") {
-    for (int i = 0; i < __countof(ssdPins); ++i) {
+    for (size_t i = 0; i < __countof(ssdPins); ++i) {
       pinMode(ssdPins[i], OUTPUT);
       digitalWrite(ssdPins[i], 0);
     }
   }
 
   if (sceleton::hasMsp430._value == "true") {
-/*   
-    debugSerial->println("========================");
-    Wire.begin(D1, D2);
-    Wire.setClock(100000);
-    debugSerial->println("Initialized MSP430s Wire");
-    debugSerial->println("========================");
-*/
     msp430 = new SoftwareSerial(D1, D0); // RX, TX
     msp430->begin(9600);
     debugSerial->println("Initialized MSP430");
@@ -681,7 +672,7 @@ void loop() {
   }
   lastLoop = millis();
 
-  long st = millis();
+  uint32_t st = millis();
 
   if (restartAt < st) {
     // debugSerial->println("ESP.reset");
@@ -733,7 +724,7 @@ void loop() {
       { "humidity", hum },
       { "pressure", pressure },
     };
-    for (int i = 0; i < sizeof(toSendArr)/sizeof(toSendArr[0]); ++i) {
+    for (size_t i = 0; i < __countof(toSendArr); ++i) {
       if (!isnan(toSendArr[i].value)) {
         String toSend = String("{ \"type\": \"") + String(toSendArr[i].name) + String("\", ") + 
             "\"value\": "  + String(toSendArr[i].value)  + ", " +  
@@ -829,7 +820,7 @@ void loop() {
         int decodedLen = 0;
         char decoded[300] = {0};
         int prevL = 0;
-        for (int i = 0; i < results.rawlen && i < sizeof(decoded); ++i) {
+        for (size_t i = 0; i < results.rawlen && i < sizeof(decoded); ++i) {
           char c = -1;
           int val = results.rawbuf[i];
           
@@ -853,17 +844,15 @@ void loop() {
         String decodedStr(decoded);
         const Remote* recognizedRemote = NULL;
         const Key* recognized = NULL;
-        int kk = 0;
-        for (int r = 0; r < (sizeof(remotes)/sizeof(remotes[0])); ++r) {
+        for (size_t r = 0; r < __countof(remotes); ++r) {
           const Remote& remote = *(remotes[r]);
-          for (int k = 0; k < remote.keys.size(); ++k) {
+          for (size_t k = 0; k < remote.keys.size(); ++k) {
             if (decodedStr.indexOf(remote.keys[k].bin) != -1) {
               // Key pressed!
               recognized = &(remote.keys[k]);
               //debugSerial->println(String(recognized->value));
 
               recognizedRemote = &remote;
-              kk = k;
 
               String keyVal(remote.keys[k].value);
               debugSerial->println(keyVal);
@@ -889,19 +878,8 @@ void loop() {
       irrecv->resume();  // Receive the next value
     }
   }
-/*
-  if (sceleton::hasMsp430._value == "true") {
-    char buf[80] = {0};
-    size_t s = 0;
-    for (; Wire.available() && s < sizeof(buf); s++) {
-      buf[s] = Wire.read();
-    }
-    if (s > 0) {
-      debugSerial->println(buf);
-    }
-  }
-*/
-  if (msp430 != NULL && sceleton::webSocketClient.get() != NULL) {
+
+  if (sceleton::hasMsp430._value == "true" && msp430 != NULL && sceleton::webSocketClient.get() != NULL) {
     for (;msp430->available() > 0;) {
       int ch = msp430->read();
       lastMsp430Ping = millis();
@@ -915,7 +893,7 @@ void loop() {
         // ping
       } else {
         // Encoders
-        for (int enc = 0; enc < __countof(encoders); ++enc) {
+        for (size_t enc = 0; enc < __countof(encoders); ++enc) {
           const char* ss = NULL;
           if (encoders[enc] + 1 == ch) {
             ss = "rotate_cw";
@@ -951,14 +929,6 @@ void loop() {
   }
 
   if (dfplayerSerial != NULL && dfplayerSerial->available() >= DFPLAYER_RECEIVED_LENGTH) {
-    /*
-    debugSerial->println("Got some bytes");
-    for (int i = 0; i < bytes; ++i) {
-      debugSerial->print(String(dfplayerSerial->read(), HEX));
-      debugSerial->print(" ");
-    }
-    debugSerial->println();
-    */
     uint8_t _serial[DFPLAYER_RECEIVED_LENGTH] = { 0 };
     dfplayerSerial->readBytes(_serial, DFPLAYER_RECEIVED_LENGTH);
 
@@ -989,9 +959,10 @@ void loop() {
   sceleton::loop();
 
   // debugSerial->println(String(millis(), DEC));
+
 #ifndef ESP01
   // Process encoders
-  for (int i = 0; i < __countof(encoders); ++i) {
+  for (size_t i = 0; i < __countof(encoders); ++i) {
     encoders[i].process();
   }
   Encoder::cont();
@@ -1031,7 +1002,7 @@ void loop() {
   if (sceleton::hasDFPlayer._value == "true") {
     if (millis() - lastReadDFBusy > 200) {
       lastReadDFBusy = millis();
-      int dfBusy = digitalRead(D3);
+      uint32_t dfBusy = (uint32_t) digitalRead(D3);
       if (dfBusy != dfBusyNow) {
         debugSerial->println("DFPlayerBusy: " + String(dfBusy, DEC));
         if (dfBusy == 1) {
@@ -1041,25 +1012,11 @@ void loop() {
         dfBusyNow = dfBusy;
       }
     }
-    /*
-    if (millis() % 5000 == 0) {
-      debugSerial->println("Requst volume");
-      dfPlayerSend(0x43, 0);
-    }
-    
-    if (millis() % 10000 == 100) {
-      dfPlayerSend(0x06, 23);
-    }
-    if (millis() % 10000 == 300) {
-      dfPlayerSend(0x03, 2); // Play
-    }
-    */
-/*
-    for (;dfplayerSerial->available() > 0;) {
-      int b = dfplayerSerial->read();
-      debugSerial->println(b);
-    }
-*/
+
+    //for (;dfplayerSerial->available() > 0;) {
+    //  int b = dfplayerSerial->read();
+    //  debugSerial->println(b);
+    //}
   }
 #endif
 

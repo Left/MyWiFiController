@@ -26,7 +26,6 @@ namespace date {
     static void epoc2rtc(uint32_t t, RTC &rtc) {
         rtc.dow = (t + 3) % 7; // Day of week
         rtc.dayOfCycle = (((t + 719162 - 365) % cycle400year) % cycle100year) % cycle4year;
-        int yearOfCycle = 0;
         rtc.year = 1970 + 
             t / cycle400year * 400 + 
             t / cycle100year * 100 + 
@@ -34,8 +33,7 @@ namespace date {
 
         for (;;) {
             // printf("%d \n", rtc.year);
-            bool leapYear = false;
-            int days = 365;
+            uint32_t days = 365;
             if (rtc.year % 400 == 0 || (rtc.year % 100 != 0 && rtc.year % 4 == 0)) {
                 days++; // Leap year
             }

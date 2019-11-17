@@ -43,8 +43,8 @@ const wchar_t MIDDLE_NUM_SYM = 0xE020;
 const wchar_t TINY_NUM_SYM = 0xE030;
 
 const uint8_t* symbolPtrOrNull(wchar_t symbol) {
-    int fontItem = fontUA[0];
-    int unicodeSym = symbol & 0xffff;
+    uint32_t fontItem = fontUA[0];
+    uint32_t unicodeSym = symbol & 0xffff;
     if (unicodeSym >= 0x410 && unicodeSym < 0x450) {
         unicodeSym = unicodeSym - 0x410 + 0xa0;
     } else if ((unicodeSym >= BIG_NUM_SYM) && (unicodeSym < (10 + BIG_NUM_SYM))) {
@@ -141,7 +141,7 @@ public:
     }
 
     virtual void pixels(std::function<void(int, int)> acceptor) const {
-        for (int yy = 0; yy < sizeof(bits); ++yy) {
+        for (size_t yy = 0; yy < sizeof(bits); ++yy) {
             for (int i = 0; i < 8; ++i) {
                 if ((bits[yy] >> i) & 1) {
                     acceptor(i, yy);
@@ -182,12 +182,12 @@ public:
     void set(const WSTR* ss, uint32_t count) {
         clear();
         uint32_t totalCnt = 0;
-        for (int i = 0; i < count; ++i) {
+        for (uint32_t i = 0; i < count; ++i) {
             totalCnt += wcslen(ss[i]);
         }
         _msg = (WSTR_MUTABLE)malloc(2*totalCnt + 2);
         WSTR_MUTABLE s = _msg;
-        for (int i = 0; i < count; ++i) {
+        for (uint32_t i = 0; i < count; ++i) {
             for (int t = 0; ss[i][t] != 0; ++t) {
                 *s = ss[i][t];
                 s++;
@@ -498,7 +498,6 @@ public:
         set(20, 0, CharacterBitmask(BIG_NUM_SYM + (hours.charAt(1) - '0')), true);
         set(26, 0, CharacterBitmask(BIG_NUM_SYM + (hours.charAt(0) - '0')), true);
 
-        int dotframe = 100;
         if (millisSince1200 % 1000 < 200) {
             set(19, 1, OnePixelAt(Rectangle(0, 0, 2, 2), millisSince1200 % 1000 / 50), true);
             set(19, 5, OnePixelAt(Rectangle(0, 0, 2, 2), millisSince1200 % 1000 / 50), true);
@@ -548,11 +547,11 @@ public:
             const int _DATA_PIN,
             const int _CS_PIN,
             bool _rotated180) : 
-            screen(_screen), 
             CLK_PIN(_CLK_PIN),
             DATA_PIN(_DATA_PIN),
             CS_PIN(_CS_PIN),
-            rotated180(_rotated180) {
+            rotated180(_rotated180),
+            screen(_screen) {
     }
 
     void sendCmd(int addr, uint8_t cmd, uint8_t data) {
