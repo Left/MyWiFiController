@@ -27,8 +27,9 @@ public:
     virtual boolean relayState(uint32_t id) { return false; } 
     virtual void setBrightness(int percents) {}
     virtual void setTime(uint32_t unixTime) {}
-    virtual void setLedStripe(std::vector<uint32_t> colors) {}
-    virtual const std::vector<uint32_t>& getLedStripe() { return empty; }
+    virtual void setLedStripe(const std::vector<uint32_t>& colors, int periodMs) {}
+    virtual uint32_t getLedStripePixel(size_t i) { return 0; }
+    virtual uint32_t getLedStripeLen() { return 0; }
     virtual void setD0PWM(uint32_t val) {}
     virtual void playMp3(uint32_t index) {}
     virtual void setVolume(uint32_t vol) {}
@@ -178,10 +179,10 @@ void onDisconnect(const WiFiEventStationModeDisconnected& event) {
     // debugSerial->println(event.reason);
 }
 
-String encodeRGBWString(const std::vector<uint32_t>& val) {
+String encodeRGBWString(Sink* sink) {
     String res = "";
-    for (uint32_t k = 0; k < val.size(); ++k) {
-        uint32_t toAdd = val[k];
+    for (uint32_t k = 0; k < sink->getLedStripeLen(); ++k) {
+        uint32_t toAdd = sink->getLedStripePixel(k);
         for (int i = 0; i<8; ++i) {
             char xx = (char)((toAdd >> (28 - i*4)) & 0xf);
             if (xx > 9) {
@@ -571,7 +572,7 @@ void loop() {
                     }
 
                     if (sceleton::hasLedStripe._value == "true") {
-                        send("{ \"type\": \"ledstripeState\", \"value\":\"" + encodeRGBWString(sink->getLedStripe()) + "\" }");
+                        send("{ \"type\": \"ledstripeState\", \"value\":\"" + encodeRGBWString(sink) + "\" }");
                         debugSerial->println("LED stripe state sent");
                     }
 
@@ -617,7 +618,8 @@ void loop() {
                     #endif
                     } else if (type == "ledstripe") {
                         const char* val = (const char*)(root["value"]);
-                        sink->setLedStripe(decodeRGBWString(val));
+                        int periodMs = root["period"].as<int>();
+                        sink->setLedStripe(decodeRGBWString(val), periodMs);
                     } else if (type == "playmp3") {
                         uint32_t index = (uint32_t)(root["index"].as<int>());
                         sink->playMp3(index);
