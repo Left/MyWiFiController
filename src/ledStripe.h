@@ -11,9 +11,14 @@ class LedStripe {
     std::vector<uint8_t> currLedStripe;
     uint32_t ledStripeChangedStartedAt;
     uint32_t ledStripeChangedEndedAt;
+    bool finished;
 
 public:
-    LedStripe(uint32_t pixels) : NUMPIXELS(pixels), ledStripeChangedStartedAt(0), ledStripeChangedEndedAt(0) {
+    LedStripe(uint32_t pixels) : 
+        NUMPIXELS(pixels), 
+        ledStripeChangedStartedAt(0), 
+        ledStripeChangedEndedAt(0), 
+        finished(false) {
         ledStripe.resize(NUMPIXELS * 4, 0);
         currLedStripe.resize(NUMPIXELS * 4, 0);
         initialLedStripe.resize(NUMPIXELS * 4, 0);
@@ -34,6 +39,7 @@ public:
         
         ledStripeChangedStartedAt = millis;
         ledStripeChangedEndedAt = millis + periodMs;
+        finished = false;
     }
 
     uint32_t getPixelCount() const {
@@ -48,7 +54,7 @@ public:
     }
 
     bool inProgress(uint32_t millis) const {
-        return ledStripeChangedStartedAt <= millis && ledStripeChangedEndedAt >= millis;
+        return !finished;
     }
 
     bool update(uint32_t millis) {
@@ -68,6 +74,10 @@ public:
                 currLedStripe[i] = val;
                 changed = true;
             }
+        }
+
+        if (!finished) {
+            finished = nowMs == fullMs;
         }
         return changed;
     }
