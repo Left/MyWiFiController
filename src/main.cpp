@@ -588,9 +588,15 @@ void setup() {
 
         virtual boolean screenEnabled() { return isScreenEnabled; }
 
-        virtual void setD0PWM(uint32_t val) {
-            uint32_t x = 1024 * val / 100;
-            analogWrite(2, x);
+        virtual void setPWMOnPin(uint32_t val, uint8_t pin) {
+            if (val == 0) {
+                digitalWrite(pin, 0);
+            } else if (val == 1) {
+                digitalWrite(pin, 1);
+            } else {
+                uint32_t x = 1024 * val / 100;
+                analogWrite(pin, x);
+            }
         }
 
         virtual void setVolume(uint32_t vol) {
@@ -712,8 +718,12 @@ void setup() {
     }
 #endif
     if (sceleton::hasPWMOnD0._value == "true") {
-        pinMode(D2, OUTPUT);
-        analogWriteFreq(50);
+        analogWriteFreq(32000);
+
+        pinMode(D4, OUTPUT);
+        pinMode(D3, OUTPUT);
+        
+        analogWrite(D3, 0);
         analogWrite(D4, 0);
     }
 
