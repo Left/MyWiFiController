@@ -4,12 +4,6 @@
 #include <Adafruit_NeoPixel.h>
 #include <Adafruit_Sensor.h>
 
-#ifndef ESP01
-#include <IRrecv.h>
-#include <IRremoteESP8266.h>
-#include <IRutils.h>
-#endif
-
 #include "worklogic.h"
 
 #ifndef ESP01
@@ -35,10 +29,6 @@ MAX72xx* screenController = NULL;
 Adafruit_BME280* bme = NULL;  // I2C
 
 // #define BEEPER_PIN D2 // Beeper
-
-#ifndef ESP01
-IRrecv* irrecv = NULL;  //
-#endif
 
 int testCntr = 0;
 
@@ -281,6 +271,14 @@ const Remote* remotes[] = {
 };
 #endif
 
+uint64_t lastIRChange = 0;
+std::vector<uint16_t> ir;
+
+static void ICACHE_RAM_ATTR irIRQHandler() { 
+    ir.push_back(micros() - lastIRChange);
+    lastIRChange = micros();
+ }
+
 boolean invertRelayState = false;
 boolean relayIsInitialized = false;
 SoftwareSerial* relay = NULL;
@@ -323,7 +321,7 @@ uint32_t ssdPins[] = {D1, D2, D5, D6};
 
 LedStripe* ledStripe = NULL;
 
-void handleInterrupt() { interruptCounter++; }
+void ICACHE_RAM_ATTR handleInterrupt() { interruptCounter++; }
 
 #ifndef ESP01
 boolean encoderPinChanged = false;
@@ -449,7 +447,7 @@ class Encoder {
     const int pinButton;
     int _pA, _pB, _pBtn;
 
-    static void pinChange() { encoderPinChanged = true; }
+    static void ICACHE_RAM_ATTR pinChange() { encoderPinChanged = true; }
 };
 
 Encoder encoders[] = {
@@ -629,9 +627,12 @@ void setup() {
 
 #ifndef ESP01
     if (sceleton::hasIrReceiver._value == "true") {
+        /*
         irrecv = new IRrecv(D2);
         irrecv->enableIRIn();  // Start the receiver
         debugSerial->println("IR receiver is initialized");
+        */
+       attachInterrupt(digitalPinToInterrupt(D2), irIRQHandler, CHANGE);
     }
 #endif
 
@@ -918,73 +919,71 @@ void loop() {
 #endif
 
 #ifndef ESP01
-    if (irrecv != NULL) {
-        decode_results results;
-        if (irrecv->decode(&results)) {
-            debugSerial->println("\n\n\nHave some results\n\n\n");
-            if (results.rawlen > 30) {
-                int decodedLen = 0;
-                char decoded[300] = {0};
-                int prevL = 0;
-                for (size_t i = 0; i < results.rawlen && i < sizeof(decoded);
-                     ++i) {
-                    char c = -1;
-                    int val = results.rawbuf[i];
+    if (micros() - lastIRChange > 75000 && ir.size() > 0) {
+        if (ir.size() > 30) {
+            int decodedLen = 0;
+            char decoded[300] = {0};
+            for (size_t i = 0; i < ir.size() && i < sizeof(decoded);
+                    ++i) {
+                char c = -1;
+                uint16_t val = ir[i];
+                bool skip = false;
 
-                    String valStr = String(val, DEC);
-                    for (; valStr.length() < 4;) valStr = " " + valStr;
+                if (val > 5000) {
+                    skip = true;
+                } else if (val > 150 && val < 900) {
+                    c = '0';
+                } else if (val > 900 && val < 3000) {
+                    c = '1';
+                } else {
+                    skip = true;
+                }
+                // debugSerial->print(String(val, DEC));
+                // debugSerial->print(" ");
 
-                    if (val > 1000) {
-                        continue;
-                    } else if ((prevL + val) > 150 && (prevL + val) < 500) {
-                        c = '0';
-                    } else if ((prevL + val) > 600 && (prevL + val) < 900) {
-                        c = '1';
-                    } else {
-                        prevL += val;
-                        continue;  // skip!
-                    }
+                if (!skip) {
                     decoded[decodedLen++] = c;
-                    prevL = 0;
                 }
+            }
+            debugSerial->println();
 
-                String decodedStr(decoded);
-                const Remote* recognizedRemote = NULL;
-                const Key* recognized = NULL;
-                for (size_t r = 0; r < __countof(remotes); ++r) {
-                    const Remote& remote = *(remotes[r]);
-                    for (size_t k = 0; k < remote.keys.size(); ++k) {
-                        if (decodedStr.indexOf(remote.keys[k].bin) != -1) {
-                            // Key pressed!
-                            recognized = &(remote.keys[k]);
-                            // debugSerial->println(String(recognized->value));
+            String decodedStr(decoded);
+            const Remote* recognizedRemote = NULL;
+            const Key* recognized = NULL;
+            for (size_t r = 0; r < __countof(remotes); ++r) {
+                const Remote& remote = *(remotes[r]);
+                for (size_t k = 0; k < remote.keys.size(); ++k) {
+                    if (decodedStr.indexOf(remote.keys[k].bin) != -1) {
+                        // Key pressed!
+                        recognized = &(remote.keys[k]);
+                        // debugSerial->println(String(recognized->value));
 
-                            recognizedRemote = &remote;
+                        recognizedRemote = &remote;
 
-                            String keyVal(remote.keys[k].value);
-                            debugSerial->println(keyVal);
+                        String keyVal(remote.keys[k].value);
+                        debugSerial->println(keyVal);
 
-                            String toSend =
-                                String("{ \"type\": \"ir_key\", ") +
-                                "\"remote\": \"" +
-                                String(recognizedRemote->name) + "\", " +
-                                "\"key\": \"" + keyVal + "\", " +
-                                "\"timeseq\": " + String(millis(), DEC) + " " +
-                                "}";
+                        String toSend =
+                            String("{ \"type\": \"ir_key\", ") +
+                            "\"remote\": \"" +
+                            String(recognizedRemote->name) + "\", " +
+                            "\"key\": \"" + keyVal + "\", " +
+                            "\"timeseq\": " + String(millis(), DEC) + " " +
+                            "}";
 
+                        if (sceleton::webSocketClient.get() != NULL) {
                             sceleton::send(toSend);
-
-                            break;
                         }
-                    }
-                }
 
-                if (recognized == NULL) {
-                    debugSerial->println("Unrecognized");
+                        break;
+                    }
                 }
             }
 
-            irrecv->resume();  // Receive the next value
+            if (recognized == NULL) {
+                debugSerial->println("Unrecognized");
+            }
+            ir.clear();
         }
     }
 
