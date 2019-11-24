@@ -304,6 +304,23 @@ typedef uint8_t DeviceAddress[8];
 DeviceAddress deviceAddress = {0};
 #endif
 
+struct PWMState {
+    uint8_t pin;
+    uint32_t startMs;
+    uint32_t endMs;
+    uint32_t lastAnalogWriteMs;
+
+    int32_t start;
+    int32_t curr;
+    int32_t target;
+
+    PWMState(uint8_t _pin) :
+        pin(_pin), startMs(0), endMs(0), lastAnalogWriteMs(0), start(0), curr(0), target(0) {
+    }
+};
+
+PWMState pwmStates[] = { PWMState(D3), PWMState(D4) };
+
 int interruptCounter = 0;
 
 uint32_t timeRetreivedInMs = 0;
@@ -586,14 +603,16 @@ void setup() {
 
         virtual boolean screenEnabled() { return isScreenEnabled; }
 
-        virtual void setPWMOnPin(uint32_t val, uint8_t pin) {
-            if (val == 0) {
-                digitalWrite(pin, 0);
-            } else if (val == 1) {
-                digitalWrite(pin, 1);
-            } else {
-                uint32_t x = 1024 * val / 100;
-                analogWrite(pin, x);
+        virtual void setPWMOnPin(uint32_t val, uint8_t pin, uint32_t periodMs) {
+            for (size_t i = 0; i < __countof(pwmStates); ++i) {
+                PWMState& pwm = pwmStates[i];
+                if (pwm.pin == pin) {
+                    pwm.startMs = millis();
+                    pwm.endMs = pwm.startMs + periodMs;
+                    pwm.start = pwm.curr;
+                    pwm.target = 1024 * val / 100;
+                    break;
+                }
             }
         }
 
@@ -723,9 +742,9 @@ void setup() {
 
         pinMode(D4, OUTPUT);
         pinMode(D3, OUTPUT);
-        
-        analogWrite(D3, 0);
-        analogWrite(D4, 0);
+
+        digitalWrite(D3, 0);
+        digitalWrite(D4, 0);
     }
 
     if (sceleton::hasGPIO1Relay._value == "true") {
@@ -1148,6 +1167,41 @@ void loop() {
 			}
 			stripe->show();
 		}
+    }
+
+    if (sceleton::hasPWMOnD0._value == "true") {
+        const uint32_t n = millis();
+        for (size_t i = 0; i < __countof(pwmStates); ++i) {
+            PWMState& pwm = pwmStates[i];
+            int32_t val = 0;
+            if (n >= pwm.endMs) {
+                val = pwm.target;
+            } else if (n <= pwm.startMs) {
+                val = pwm.curr;\
+            } else {
+                val = pwm.start + (int32_t)(n - pwm.startMs) * (int32_t)(pwm.target - pwm.start) / (int32_t)(pwm.endMs - pwm.startMs);
+            }
+
+            if (val < 0) {
+                val = 0;
+            } else if (val > 1023) {
+                val = 1023;
+            }
+
+            if (val != pwm.curr) {
+                if (pwm.lastAnalogWriteMs + 50 < millis()) {
+                    pwm.lastAnalogWriteMs = millis();
+                    pwm.curr = val;
+                    if (val == 0) {
+                        digitalWrite(pwm.pin, 0);
+                    } else if (val >= 1023) {
+                        digitalWrite(pwm.pin, 1);
+                    } else {
+                        analogWrite(pwm.pin, val);
+                    }
+                }
+            }
+        }
     }
 
     lastLoopEnd = millis();

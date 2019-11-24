@@ -30,7 +30,7 @@ public:
     virtual void setLedStripe(const std::vector<uint32_t>& colors, int periodMs) {}
     virtual uint32_t getLedStripePixel(size_t i) { return 0; }
     virtual uint32_t getLedStripeLen() { return 0; }
-    virtual void setPWMOnPin(uint32_t val, uint8_t pin) {}
+    virtual void setPWMOnPin(uint32_t val, uint8_t pin, uint32_t periodMs) {}
     virtual void playMp3(uint32_t index) {}
     virtual void setVolume(uint32_t vol) {}
     virtual void reboot() {}
@@ -629,10 +629,11 @@ void loop() {
                     } else if (type == "pwm") {
                         int val = root["value"].as<int>();
                         const char* pin = root["pin"];
+                        uint32_t periodMs = root["period"].as<int>();
                         if (strcmp(pin, "D3") == 0) {
-                            sink->setPWMOnPin(val, D3);
+                            sink->setPWMOnPin(val, D3, periodMs);
                         } else if (strcmp(pin, "D4") == 0) {
-                            sink->setPWMOnPin(val, D4);
+                            sink->setPWMOnPin(val, D4, periodMs);
                         }
                     #ifndef ESP01
                     } else if (type == "screenEnable") {
