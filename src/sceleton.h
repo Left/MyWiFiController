@@ -114,12 +114,13 @@ DevParam hasDFPlayer("hasDFPlayer", "dfplayer", "Has DF player", "false");
 #endif
 DevParam hasBME280("hasBME280", "bme280", "Has BME280 (temp & humidity sensor)", "false");
 DevParam hasLedStripe("hasLedStripe", "ledstrip", "Has RGBW Led stripe", "false");
+DevParam hasBluePill("hasBluePill", "bluepill", "Has bluepill", "false");
 #ifndef ESP01
 DevParam hasButton("hasButton", "d7btn", "Has button on D7", "false");
 DevParam brightness("brightness", "bright", "Brightness [0..100]", "0");
 DevParam hasEncoders("hasEncoders", "enc", "Has encoders", "false");
 DevParam hasMsp430("hasMsp430WithEncoders", "msp430", "Has MSP430 with encoders", "false");
-DevParam hasPotenciometer("hasPotenciometer", "potent", "Has potenciometer", "false");
+DevParam hasPotenciometer("hasPotenciometer", "potent", "Has ADC connected", "false");
 DevParam hasSolidStateRelay("hasSSR", "ssr", "Has Solid State Relay (D1, D2, D5, D6)", "false");
 #endif
 DevParam relayNames("relay.names", "relays", "Relay names, separated by ;", "");
@@ -149,6 +150,7 @@ DevParam* devParams[] = {
 #endif
     &hasBME280,
     &hasLedStripe,
+    &hasBluePill,
 #ifndef ESP01
     &hasEncoders,
     &hasButton, 
@@ -723,7 +725,6 @@ void loop() {
     }
 
     if (saveBrightnessAt < millis()) {
-        saveSettings();
         saveBrightnessAt = 0x7FFFFFFF;
     }
 /*

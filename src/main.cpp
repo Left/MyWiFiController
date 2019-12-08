@@ -15,6 +15,14 @@
 #include "ledStripe.h"
 #include <SoftwareSerial.h>
 
+
+#include <pb_encode.h>
+#include <pb_decode.h>
+#include "../../BluePillTest/src/protocol.pb.h"
+extern "C" {
+    #include "../../BluePillTest/src/protocol.pb.c"
+}
+
 unsigned int localPort = 2390;  // local port to listen for UDP packets
 
 const uint64_t dayInMs = 24 * 60 * 60 * 1000;
@@ -269,7 +277,6 @@ const Remote* remotes[] = {
 	&prologicTV,
 	&transcendPhotoFrame
 };
-#endif
 
 uint64_t lastIRChange = 0;
 std::vector<uint16_t> ir;
@@ -277,7 +284,10 @@ std::vector<uint16_t> ir;
 static void ICACHE_RAM_ATTR irIRQHandler() { 
     ir.push_back(micros() - lastIRChange);
     lastIRChange = micros();
- }
+}
+#endif
+
+std::vector<uint8_t> protobuf;
 
 boolean invertRelayState = false;
 boolean relayIsInitialized = false;
@@ -328,10 +338,11 @@ uint32_t initialUnixTime = 0;
 uint32_t restartAt = ULONG_MAX;
 #ifndef ESP01
 uint32_t nextPotentiometer = 0;
-uint32_t potentiometerValues[] = {0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                  0, 0, 0, 0, 0, 0, 0, 0};
-uint32_t potentiometerIndex = 0;
-int32_t reportedPotentiometer = -1;
+
+uint16_t analogInValues[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+uint8_t analogReadIndex = 0;
+
+int32_t reportedAnalogValue = -1;
 
 uint32_t ssdPins[] = {D1, D2, D5, D6};
 #endif
@@ -388,7 +399,7 @@ void dfPlayerSend(uint8_t command, uint16_t argument) {
     uint16ToArray(argument, _sending + Stack_Parameter);
     uint16ToArray(calculateCheckSum(_sending), _sending + Stack_CheckSum);
 
-    debugSerial->print("SEND:");
+    debugSerial->print("SENDING to DFplayer:");
     for (int i = 0; i < DFPLAYER_SEND_LENGTH; ++i) {
         debugSerial->print(String(_sending[i], HEX));
         debugSerial->print(" ");
@@ -396,6 +407,7 @@ void dfPlayerSend(uint8_t command, uint16_t argument) {
     debugSerial->println();
 
     dfplayerSerial->write(_sending, DFPLAYER_SEND_LENGTH);
+    debugSerial->println("SENT");
 }
 
 class Encoder {
@@ -739,6 +751,7 @@ void setup() {
 #endif
     if (sceleton::hasPWMOnD0._value == "true") {
         analogWriteFreq(32000);
+        analogWriteRange(1024);
 
         pinMode(D4, OUTPUT);
         pinMode(D3, OUTPUT);
@@ -749,6 +762,12 @@ void setup() {
 
     if (sceleton::hasGPIO1Relay._value == "true") {
     }
+
+    if (sceleton::hasBluePill._value == "true") {
+        debugSerial = new sceleton::DummySerial();
+
+        Serial.begin(460800);
+    }
 }
 
 unsigned long oldMicros = micros();
@@ -757,6 +776,7 @@ uint32_t lastScreenRefresh = millis();
 uint16_t hours = 0;
 uint16_t mins = 0;
 uint64_t nowMs = 0;
+
 
 const int updateTimeEachSec = 600;  // By default, update time each 600 seconds
 
@@ -1099,37 +1119,27 @@ void loop() {
         (nextPotentiometer < millis())) {
         nextPotentiometer = millis() + 50;
         int readingIn = analogRead(A0);
-        potentiometerValues[potentiometerIndex++ %
-                            __countof(potentiometerValues)] = readingIn;
+        analogInValues[analogReadIndex++ %
+                            __countof(analogInValues)] = readingIn;
 
         String s = "";
         int32_t total = 0;
-        for (uint8_t ind = 0; ind < __countof(potentiometerValues); ++ind) {
-            total += potentiometerValues[ind];
+        for (uint8_t ind = 0; ind < __countof(analogInValues); ++ind) {
+            total += analogInValues[ind];
             s += " ";
-            s += String(potentiometerValues[ind], DEC);
+            s += String(analogInValues[ind], DEC);
         }
 
-        const int32_t maxVol = 939;
-        const int32_t minVol = 830;
-        const int32_t distance = (maxVol - minVol);
-        readingIn =
-            100 -
-            (std::min(
-                 maxVol,
-                 std::max(minVol,
-                          (int32_t)(total / __countof(potentiometerValues)))) -
-             minVol) *
-                100 / distance;
+        readingIn = (int32_t)(total / __countof(analogInValues));
 
-        if (reportedPotentiometer != readingIn) {
+        if (reportedAnalogValue != readingIn) {
             if (sceleton::webSocketClient.get() != NULL) {
                 String toSend = String("{ \"type\": \"potentiometer\", ") +
                                 "\"value\": \"" + readingIn + "\", " +
                                 "\"timeseq\": " + String(millis(), DEC) + " " +
                                 "}";
                 sceleton::send(toSend);
-                reportedPotentiometer = readingIn;
+                reportedAnalogValue = readingIn;
             }
         }
     }
@@ -1189,7 +1199,7 @@ void loop() {
             }
 
             if (val != pwm.curr) {
-                if (pwm.lastAnalogWriteMs + 50 < millis()) {
+                if (pwm.lastAnalogWriteMs + 10 < millis()) {
                     pwm.lastAnalogWriteMs = millis();
                     pwm.curr = val;
                     if (val == 0) {
@@ -1200,6 +1210,24 @@ void loop() {
                         analogWrite(pwm.pin, val);
                     }
                 }
+            }
+        }
+    }
+
+    if (sceleton::hasBluePill._value == "true") {
+        size_t avail = Serial.available();
+        if (avail > 0) {
+            size_t olds = protobuf.size();
+            protobuf.resize(olds + avail);            
+            size_t read = Serial.readBytes(&protobuf[olds], avail);
+
+            SimpleMessage message = SimpleMessage_init_zero;
+            pb_istream_t stream = pb_istream_from_buffer(&protobuf[0], protobuf.size());
+
+            if (pb_decode(&stream, SimpleMessage_fields, &message)) {
+                debugPrint(String(message.id, DEC) + " -> " + String(message.num, DEC) + " " + String(message.str));
+
+                protobuf.resize(0);
             }
         }
     }
