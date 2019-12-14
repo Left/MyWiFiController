@@ -3,6 +3,7 @@
 #include <Adafruit_BME280.h>
 #include <Adafruit_NeoPixel.h>
 #include <Adafruit_Sensor.h>
+#include <WiFiUDP.h>
 
 #include "worklogic.h"
 
@@ -36,6 +37,7 @@ MAX72xx* screenController = NULL;
 
 Adafruit_BME280* bme = NULL;  // I2C
 
+WiFiUDP udpClient;
 // #define BEEPER_PIN D2 // Beeper
 
 int testCntr = 0;
@@ -287,6 +289,9 @@ static void ICACHE_RAM_ATTR irIRQHandler() {
 }
 #endif
 
+uint8_t bluePillPacketStart[] = {0x80, 0x1d, 0x7d, 0x2e, 0x00, 0x03, 0xb9, 0x13 };
+uint8_t bluePillPacketEnd[] = {0xff, 0x5b, 0xa1, 0x35, 0x33, 0x6f, 0xf5, 0x37 };
+
 std::vector<uint8_t> protobuf;
 
 boolean invertRelayState = false;
@@ -343,6 +348,8 @@ uint16_t analogInValues[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 uint8_t analogReadIndex = 0;
 
 int32_t reportedAnalogValue = -1;
+
+int oldPowerState = -1;
 
 uint32_t ssdPins[] = {D1, D2, D5, D6};
 #endif
@@ -615,6 +622,10 @@ void setup() {
 
         virtual boolean screenEnabled() { return isScreenEnabled; }
 
+        virtual void switchATX(const boolean on) {
+            digitalWrite(D8, on ? 0 : 1); // 1 means DOWN! to start ATX we connect green wire with black
+        }
+
         virtual void setPWMOnPin(uint32_t val, uint8_t pin, uint32_t periodMs) {
             for (size_t i = 0; i < __countof(pwmStates); ++i) {
                 PWMState& pwm = pwmStates[i];
@@ -748,6 +759,12 @@ void setup() {
         pinMode(D2, OUTPUT);
         digitalWrite(D2, 1);
     }
+
+    if (sceleton::hasATXPowerSupply._value == "true") {
+        pinMode(D8, OUTPUT);
+        digitalWrite(D8, 1); // 1 means DOWN
+        pinMode(D2, INPUT);
+    }
 #endif
     if (sceleton::hasPWMOnD0._value == "true") {
         analogWriteFreq(32000);
@@ -766,6 +783,7 @@ void setup() {
     if (sceleton::hasBluePill._value == "true") {
         debugSerial = new sceleton::DummySerial();
 
+        udpClient.begin(sceleton::websocketPort._value.toInt() + 1);
         Serial.begin(460800);
     }
 }
@@ -1154,7 +1172,7 @@ void loop() {
                 debugSerial->println("DFPlayerBusy: " + String(dfBusy, DEC));
                 if (dfBusy == 1) {
                     // Stopped playing, let's set volume to 0
-                    dfPlayerSend(0x06, (uint16_t)0);
+                    // dfPlayerSend(0x06, (uint16_t)0);
                 }
                 dfBusyNow = dfBusy;
             }
@@ -1219,15 +1237,46 @@ void loop() {
         if (avail > 0) {
             size_t olds = protobuf.size();
             protobuf.resize(olds + avail);            
-            size_t read = Serial.readBytes(&protobuf[olds], avail);
+            Serial.readBytes(&protobuf[olds], avail);
 
-            SimpleMessage message = SimpleMessage_init_zero;
-            pb_istream_t stream = pb_istream_from_buffer(&protobuf[0], protobuf.size());
+            uint8_t* bufferStart = &protobuf[0];
+            uint8_t* bufferEnd = bufferStart + protobuf.size();
 
-            if (pb_decode(&stream, SimpleMessage_fields, &message)) {
-                debugPrint(String(message.id, DEC) + " -> " + String(message.num, DEC) + " " + String(message.str));
+            uint8_t* startSeq = std::search(bufferStart, bufferEnd,
+                &bluePillPacketStart[0], &bluePillPacketStart[0] + __countof(bluePillPacketStart));
+            uint8_t* endSeq = std::search(bufferStart, bufferEnd,
+                &bluePillPacketEnd[0], &bluePillPacketEnd[0] + __countof(bluePillPacketEnd));
+            
+            if ((startSeq != bufferEnd) && (endSeq != bufferEnd)) {               
+                udpClient.beginPacket(
+                    sceleton::websocketServer._value.c_str(), 
+                    sceleton::websocketPort._value.toInt() + 1);
+                for (const uint8_t* p = startSeq + __countof(bluePillPacketStart);
+                    p != endSeq; ++p) {
+                    udpClient.write(*p);
+                }
+                udpClient.endPacket();
+                
+                uint8_t* out = bufferStart;
+                for (const uint8_t* p = endSeq + __countof(bluePillPacketEnd);
+                    p != bufferEnd; ++p, ++out) {
+                    *out = *p;
+                }
 
-                protobuf.resize(0);
+                protobuf.resize(out - bufferStart);
+            }
+        }
+    }
+
+    if (millis() % 500 == 12) {
+        if (sceleton::hasATXPowerSupply._value == "true") {
+            int currAtxState = digitalRead(D2);
+            if (oldPowerState != currAtxState) {
+                oldPowerState = currAtxState;
+                String toSend =
+                        String("{ \"type\": \"atxState\", ") + "\"value\": " +  String(currAtxState, DEC) + ", " +
+                        "\"timeseq\": " + String(millis(), DEC) + " " + "}";
+                sceleton::send(toSend);
             }
         }
     }

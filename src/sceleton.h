@@ -36,6 +36,7 @@ public:
     virtual void reboot() {}
     virtual void enableScreen(const boolean enabled) {}
     virtual boolean screenEnabled() { return false; }
+    virtual void switchATX(const boolean on) {}
 };
 
 String fileToString(const String& fileName) {
@@ -122,6 +123,7 @@ DevParam hasEncoders("hasEncoders", "enc", "Has encoders", "false");
 DevParam hasMsp430("hasMsp430WithEncoders", "msp430", "Has MSP430 with encoders", "false");
 DevParam hasPotenciometer("hasPotenciometer", "potent", "Has ADC connected", "false");
 DevParam hasSolidStateRelay("hasSSR", "ssr", "Has Solid State Relay (D1, D2, D5, D6)", "false");
+DevParam hasATXPowerSupply("hasATXPowerSupply", "atx", "Has ATX power supply", "false");
 #endif
 DevParam relayNames("relay.names", "relays", "Relay names, separated by ;", "");
 //DevParam relayNames("relay.names", "relays", "Relay names, separated by ;", "Потолок;Лента");
@@ -162,6 +164,7 @@ DevParam* devParams[] = {
 #ifndef ESP01
     &hasPotenciometer,
     &hasSolidStateRelay,
+    &hasATXPowerSupply,
 #endif
     &hasPWMOnD0,
     &secondsBeforeRestart
@@ -636,8 +639,13 @@ void loop() {
                             sink->setPWMOnPin(val, D3, periodMs);
                         } else if (strcmp(pin, "D4") == 0) {
                             sink->setPWMOnPin(val, D4, periodMs);
+                        } else if (strcmp(pin, "D7") == 0) {
+                            sink->setPWMOnPin(val, D7, periodMs);
                         }
                     #ifndef ESP01
+                    } else if (type == "atxEnable") {
+                        int val = root["value"].as<boolean>();
+                        sink->switchATX(val);
                     } else if (type == "screenEnable") {
                         int val = root["value"].as<boolean>();
                         sink->enableScreen(val);
