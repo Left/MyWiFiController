@@ -334,7 +334,7 @@ struct PWMState {
     }
 };
 
-PWMState pwmStates[] = { PWMState(D3), PWMState(D4) };
+PWMState pwmStates[] = { PWMState(D3), PWMState(D4), PWMState(D7), PWMState(D6), PWMState(D5) };
 
 int interruptCounter = 0;
 
@@ -516,7 +516,8 @@ void setup() {
 #ifndef ESP01
             if (sceleton::hasSolidStateRelay._value == "true") {
                 if (id >= 0 && id < 4) {
-                    digitalWrite(ssdPins[id], val ? 1 : 0);
+                    bool invert = sceleton::invertRelayControl._value == "true";
+                    digitalWrite(ssdPins[id], val ? (invert ? 0 : 1) : (invert ? 1 : 0));
                 }
             } else {
 #endif
@@ -583,7 +584,12 @@ void setup() {
 
         virtual void setLedStripe(const std::vector<uint32_t>& colors,
                                   int periodMs) {
-			ledStripe->set(colors, periodMs, millis());
+			ledStripe->set(colors, periodMs);
+        }
+
+        virtual void runLedStripeEffect(uint32_t mainClr, std::vector<uint32_t> blinks,
+                                  int periodMs) {
+			ledStripe->runLedStripeEffect(mainClr, blinks, periodMs);
         }
 
         virtual uint32_t getLedStripePixel(size_t i) {
@@ -655,7 +661,7 @@ void setup() {
     sceleton::setup(new SinkImpl());
 
     if (sceleton::hasLedStripe._value == "true") {
-		ledStripe = new LedStripe(NUMPIXELS);
+		ledStripe = new LedStripe(NUMPIXELS, [=]() { return millis(); });
         stripe = new Adafruit_NeoPixel(NUMPIXELS, 0, NEO_GRBW + NEO_KHZ800);
         stripe->begin();
 
@@ -746,9 +752,10 @@ void setup() {
     }
 
     if (sceleton::hasSolidStateRelay._value == "true") {
+        bool invert = sceleton::invertRelayControl._value == "true";
         for (size_t i = 0; i < __countof(ssdPins); ++i) {
             pinMode(ssdPins[i], OUTPUT);
-            digitalWrite(ssdPins[i], 0);
+            digitalWrite(ssdPins[i], invert ? 1 : 0);
         }
     }
 
@@ -767,14 +774,20 @@ void setup() {
     }
 #endif
     if (sceleton::hasPWMOnD0._value == "true") {
-        analogWriteFreq(32000);
+        analogWriteFreq(21000);
         analogWriteRange(1024);
 
-        pinMode(D4, OUTPUT);
         pinMode(D3, OUTPUT);
+        pinMode(D4, OUTPUT);
+        pinMode(D7, OUTPUT);
+        pinMode(D6, OUTPUT);
+        pinMode(D5, OUTPUT);
 
-        digitalWrite(D3, 0);
-        digitalWrite(D4, 0);
+        analogWrite(D3, 0);
+        analogWrite(D4, 0);
+        analogWrite(D7, 0);
+        digitalWrite(D6, 1);
+        digitalWrite(D5, 1);
     }
 
     if (sceleton::hasGPIO1Relay._value == "true") {
@@ -1186,8 +1199,8 @@ void loop() {
 #endif
 
     // Led stripe
-    if (ledStripe != NULL && ledStripe->inProgress(millis())) {
-        if (ledStripe->update(millis())) {
+    if (ledStripe != NULL && ledStripe->inProgress()) {
+        if (ledStripe->update()) {
 			for (size_t i = 0; i < ledStripe->getPixelCount(); i++) {
 				uint32_t v = ledStripe->getPixel(i);
 				stripe->setPixelColor(
@@ -1268,18 +1281,22 @@ void loop() {
         }
     }
 
+#ifndef ESP01
     if (millis() % 500 == 12) {
         if (sceleton::hasATXPowerSupply._value == "true") {
             int currAtxState = digitalRead(D2);
             if (oldPowerState != currAtxState) {
                 oldPowerState = currAtxState;
-                String toSend =
+                if (sceleton::webSocketClient.get() != NULL) {
+                    String toSend =
                         String("{ \"type\": \"atxState\", ") + "\"value\": " +  String(currAtxState, DEC) + ", " +
                         "\"timeseq\": " + String(millis(), DEC) + " " + "}";
-                sceleton::send(toSend);
+                    sceleton::send(toSend);
+                }
             }
         }
     }
+#endif
 
     lastLoopEnd = millis();
 }

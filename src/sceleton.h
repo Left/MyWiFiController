@@ -28,6 +28,7 @@ public:
     virtual void setBrightness(int percents) {}
     virtual void setTime(uint32_t unixTime) {}
     virtual void setLedStripe(const std::vector<uint32_t>& colors, int periodMs) {}
+    virtual void runLedStripeEffect(uint32_t mainClr, std::vector<uint32_t> blinks, int periodMs) {}
     virtual uint32_t getLedStripePixel(size_t i) { return 0; }
     virtual uint32_t getLedStripeLen() { return 0; }
     virtual void setPWMOnPin(uint32_t val, uint8_t pin, uint32_t periodMs) {}
@@ -59,6 +60,8 @@ const char* firmwareVersion = "00.22";
 
 std::auto_ptr<AsyncWebServer> setupServer;
 std::auto_ptr<WebSocketsClient> webSocketClient;
+
+const int dpin[] = { D0, D1, D2, D3, D4, D5, D6, D7, D8, D9 };
 
 long vccVal = 0;
 uint32_t rebootAt = 0x7FFFFFFF;
@@ -622,9 +625,18 @@ void loop() {
                         sink->setTime(root["value"].as<int>());
                     #endif
                     } else if (type == "ledstripe") {
-                        const char* val = (const char*)(root["value"]);
-                        int periodMs = root["period"].as<int>();
-                        sink->setLedStripe(decodeRGBWString(val), periodMs);
+                        if (root["newyear"]) {
+                            const char* basecolor = (const char*)(root["basecolor"]);
+                            const char* blinkcolors = (const char*)(root["blinkcolors"]);
+                            int periodMs = root["period"].as<int>();
+                            sink->runLedStripeEffect(decodeRGBWString(basecolor)[0], decodeRGBWString(blinkcolors), periodMs);
+                        } else {
+                            const char* val = (const char*)(root["value"]);
+                            int periodMs = root["period"].as<int>();
+                            sink->setLedStripe(decodeRGBWString(val), periodMs);
+                        }
+                    
+                        
                     } else if (type == "playmp3") {
                         uint32_t index = (uint32_t)(root["index"].as<int>());
                         sink->playMp3(index);
@@ -635,12 +647,8 @@ void loop() {
                         int val = root["value"].as<int>();
                         const char* pin = root["pin"];
                         uint32_t periodMs = root["period"].as<int>();
-                        if (strcmp(pin, "D3") == 0) {
-                            sink->setPWMOnPin(val, D3, periodMs);
-                        } else if (strcmp(pin, "D4") == 0) {
-                            sink->setPWMOnPin(val, D4, periodMs);
-                        } else if (strcmp(pin, "D7") == 0) {
-                            sink->setPWMOnPin(val, D7, periodMs);
+                        if (pin[0] == 'D') {
+                            sink->setPWMOnPin(val, dpin[pin[1] - '0'], periodMs);
                         }
                     #ifndef ESP01
                     } else if (type == "atxEnable") {

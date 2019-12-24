@@ -12,12 +12,6 @@ void print(LedStripe* ls) {
         printf("%02x ", *it);
     }
     printf("\n");
-/*
-    for (std::vector<uint8_t>::const_iterator it = ls->target().begin(); it != ls->target().end(); ++it) {
-        printf("%02x ", *it);
-    }
-    printf("\n");
-*/
 }
 
 int main(int argc, char const *argv[]) {   
