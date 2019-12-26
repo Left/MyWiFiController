@@ -593,12 +593,12 @@ void setup() {
 			ledStripe->runLedStripeEffect(mainClr, blinks, periodMs);
         }
 
-        virtual uint32_t getLedStripePixel(size_t i) {
-			return ledStripe->getPixel(i);
+        virtual std::array<uint8_t, 4> getLedStripePixel(size_t i) {
+			return ledStripe->pixel(i);
         }
 
         virtual uint32_t getLedStripeLen() { 
-			return ledStripe->getPixelCount(); 
+			return ledStripe->pixelCount(); 
 		}
 
         uint32_t restartReportedAt = 0;
@@ -666,10 +666,10 @@ void setup() {
         stripe = new Adafruit_NeoPixel(NUMPIXELS, 0, NEO_GRBW + NEO_KHZ800);
         stripe->begin();
 
-        for (size_t i = 0; i < ledStripe->getPixelCount(); i++) {
-			uint32_t v = ledStripe->getPixel(i);
+        for (size_t i = 0; i < ledStripe->pixelCount(); i++) {
+			auto v = ledStripe->pixel(i);
             stripe->setPixelColor(
-                i, stripe->Color((v >> 24) & 0xff, (v >> 16) & 0xff, (v >> 8) & 0xff, (v >> 0) & 0xff));
+                i, stripe->Color(v[0], v[1], v[2], v[3]));
         }
         stripe->show();
     }
@@ -1200,13 +1200,13 @@ void loop() {
 #endif
 
     // Led stripe
-    if (ledStripe != NULL && (millis() - lastLedStripeUpdate) > 20 ) {
+    if (ledStripe != NULL && (millis() - lastLedStripeUpdate) > 50 ) {
         lastLedStripeUpdate = millis();
         if (ledStripe->update()) {
-			for (size_t i = 0; i < ledStripe->getPixelCount(); i++) {
-				uint32_t v = ledStripe->getPixel(i);
+			for (size_t i = 0; i < ledStripe->pixelCount(); i++) {
+				auto v = ledStripe->pixel(i);
 				stripe->setPixelColor(
-					i, stripe->Color((v >> 24) & 0xff, (v >> 16) & 0xff, (v >> 8) & 0xff, (v >> 0) & 0xff));
+					i, stripe->Color(v[0], v[1], v[2], v[3]));
 			}
 			stripe->show();
 		}

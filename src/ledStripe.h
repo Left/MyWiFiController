@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <vector>
+#include <array>
 #include <map>
 #include <functional>
 #include <sys/types.h>
@@ -14,6 +15,7 @@ class LedStripe {
 
     class LedEffect {
     public:
+        virtual ~LedEffect() {}
         virtual bool finished() = 0;
         virtual bool update(std::vector<uint8_t>& currLedStripe) = 0;
     };
@@ -83,32 +85,36 @@ class LedStripe {
         }
     };
 
+    static std::array<uint8_t, 4> parseColor(uint32_t clr) {
+        return { (uint8_t) (clr >> 24), (uint8_t) (clr >> 16), (uint8_t) (clr >> 8), (uint8_t) clr };
+    }
+
     class NewYear : public LedEffect {
     public:
         struct Blink {
-            uint32_t color;
+            std::array<uint8_t, 4> color;
             uint32_t aliveFrom;
             uint32_t aliveTill;
         };
 
         std::map<size_t, Blink> _blinks;
-        uint32_t mainClr;
+        std::array<uint8_t, 4> mainClr;
         uint32_t periodMs;
         std::vector<uint8_t> prevLedStripe;
         const std::function<uint32_t(void)> millis;
         
         NewYear(const std::vector<uint8_t>& currLedStripe, uint32_t mainClr_, const std::vector<uint32_t>& blinks, uint32_t periodMs_, const std::function<uint32_t(void)> millis_) :
-            mainClr(mainClr_),
+            mainClr(parseColor(mainClr_)),
             periodMs(periodMs_),
             millis(millis_) {
             const size_t NUMPIXELS = currLedStripe.size() / 4;
 
             for (size_t i = 0; i < blinks.size(); ++i) {
-                makeNewBlink(NUMPIXELS, blinks[i]);
+                makeNewBlink(NUMPIXELS, parseColor(blinks[i]));
             }
         }
 
-        void makeNewBlink(size_t NUMPIXELS, uint32_t clr) {
+        void makeNewBlink(size_t NUMPIXELS, std::array<uint8_t, 4> clr) {
             for (;;) {
                 size_t index = std::rand() % NUMPIXELS;
                 if (_blinks.find(index) == _blinks.end()) {
@@ -126,28 +132,38 @@ class LedStripe {
             uint32_t m = millis();
             const size_t NUMPIXELS = currLedStripe.size() / 4;
             prevLedStripe.resize(0);
-            for (size_t i = 0; i < NUMPIXELS; ++i) {
-                uint32_t clr = mainClr;
-                if (_blinks.find(i) != _blinks.end()) {
-                    const Blink bl = _blinks[i];
+            for (size_t i = 0; i < NUMPIXELS * 4; ++i) {
+                size_t pixel = i / 4;
+                uint8_t clr = mainClr[i % 4];
+                if (_blinks.find(pixel) != _blinks.end()) {
+                    const Blink bl = _blinks[pixel];
                     if (m >= bl.aliveTill) {
-                        _blinks.erase(i);
+                        _blinks.erase(pixel);
                         makeNewBlink(NUMPIXELS, bl.color);
                     } else {
                         int32_t n = m - bl.aliveFrom;
                         int32_t fullMs = bl.aliveTill - bl.aliveFrom;
-                        clr = 
-                            (((((int32_t)((bl.color >> 24) & 0xff) + ((((int32_t)clr >> 24) & 0xff) - (((int32_t)bl.color >> 24) & 0xff)) * n / fullMs)) << 24) & 0xff000000) |
-                            (((((int32_t)((bl.color >> 16) & 0xff) + ((((int32_t)clr >> 16) & 0xff) - (((int32_t)bl.color >> 16) & 0xff)) * n / fullMs)) << 16) & 0x00ff0000) |
-                            (((((int32_t)((bl.color >>  8) & 0xff) + ((((int32_t)clr >>  8) & 0xff) - (((int32_t)bl.color >>  8) & 0xff)) * n / fullMs)) <<  8) & 0x0000ff00) |
-                            (((((int32_t)((bl.color >>  0) & 0xff) + ((((int32_t)clr >>  0) & 0xff) - (((int32_t)bl.color >>  0) & 0xff)) * n / fullMs)) <<  0) & 0x000000ff)
-                        ;
+                        int32_t stageLen = fullMs/3;
+                        int stage = n/stageLen;
+                        n -= stage*stageLen;
+                        int32_t diffBetweenColors = ((int16_t)clr - ((int16_t)bl.color[i % 4]));
+                        switch (stage) {
+                            case 0:
+                                // 
+                                clr = 
+                                    (((bl.color[i % 4] + diffBetweenColors * (stageLen - n) / (stageLen))));
+                                break;
+                            case 1:
+                                clr = bl.color[i % 4];
+                                break;
+                            case 2:
+                                clr = 
+                                    (((bl.color[i % 4] + diffBetweenColors * n / (stageLen))));
+                                break;
+                        }
                     }
                 }
-                prevLedStripe.push_back((clr >> 24) & 0xff);
-                prevLedStripe.push_back((clr >> 16) & 0xff);
-                prevLedStripe.push_back((clr >>  8) & 0xff);
-                prevLedStripe.push_back((clr >>  0) & 0xff);
+                prevLedStripe.push_back(clr);
             }
             if (prevLedStripe == currLedStripe) {
                 return false;
@@ -171,15 +187,13 @@ public:
         effect.reset(new MutateTo(currLedStripe, colors, periodMs, millis));
     }
 
-    uint32_t getPixelCount() const {
+    uint32_t pixelCount() const {
         return NUMPIXELS;
     }
 
-    uint32_t getPixel(uint32_t i) const {
-        return (currLedStripe[i * 4] << 24) |
-            (currLedStripe[i * 4 + 1] << 16) |
-            (currLedStripe[i * 4 + 2] << 8) |
-            (currLedStripe[i * 4 + 3] << 0);
+    std::array<uint8_t, 4> pixel(size_t i) const {
+        auto ind = currLedStripe.begin() + i * 4;
+        return { *(ind++), *(ind++), *(ind++), *(ind++) };
     }
 
     bool update() {

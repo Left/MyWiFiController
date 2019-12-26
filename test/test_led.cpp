@@ -23,8 +23,9 @@ void printLed(const LedStripe& l) {
     putp(tigetstr((char *)"clear"));
     putp( tparm( tigetstr((char *)"cup" ), 0, 0, 0, 0, 0, 0, 0, 0, 0 ) );
 
-    for (auto i = 0; i < l.getPixelCount(); ++i) {
-        printf("%08x ", l.getPixel(i));
+    for (auto i = 0; i < l.pixelCount(); ++i) {
+        auto px = l.pixel(i);
+        printf("%02x.%02x.%02x.%02x  ", px[0], px[1], px[2], px[3]);
     }
 
     printf("\n");

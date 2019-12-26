@@ -2,6 +2,7 @@
 
 #include "common.h"
 
+#include <array>
 #include <Arduino.h>
 #include <FS.h>
 #include <ArduinoJson.h>
@@ -29,7 +30,7 @@ public:
     virtual void setTime(uint32_t unixTime) {}
     virtual void setLedStripe(const std::vector<uint32_t>& colors, int periodMs) {}
     virtual void runLedStripeEffect(uint32_t mainClr, std::vector<uint32_t> blinks, int periodMs) {}
-    virtual uint32_t getLedStripePixel(size_t i) { return 0; }
+    virtual std::array<uint8_t, 4> getLedStripePixel(size_t i) { return {0, 0, 0, 0}; }
     virtual uint32_t getLedStripeLen() { return 0; }
     virtual void setPWMOnPin(uint32_t val, uint8_t pin, uint32_t periodMs) {}
     virtual void playMp3(uint32_t index) {}
@@ -190,9 +191,9 @@ void onDisconnect(const WiFiEventStationModeDisconnected& event) {
 String encodeRGBWString(Sink* sink) {
     String res = "";
     for (uint32_t k = 0; k < sink->getLedStripeLen(); ++k) {
-        uint32_t toAdd = sink->getLedStripePixel(k);
+        auto toAdd = sink->getLedStripePixel(k);
         for (int i = 0; i<8; ++i) {
-            char xx = (char)((toAdd >> (28 - i*4)) & 0xf);
+            char xx = (char)((toAdd[i/2] >> ((i % 2) * 4)) & 0xf);
             if (xx > 9) {
                 res += (char)('A' + (xx - 10));
             } else {

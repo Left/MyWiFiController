@@ -2,7 +2,7 @@
 #include <stdio.h>
 
 void print(LedStripe* ls) {
-    for (uint32_t i = 0; i < ls->getPixelCount(); ++i) {
+    for (uint32_t i = 0; i < ls->pixelCount(); ++i) {
         uint32_t p = ls->getPixel(i);
         printf("%08x ", p);
     }
