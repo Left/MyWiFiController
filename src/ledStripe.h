@@ -23,9 +23,7 @@ class LedStripe {
         virtual bool update(std::vector<uint8_t>& currLedStripe) { return false; }
     };
 
-    Still STILL;
-
-    LedEffect* effect = &STILL;
+    std::unique_ptr<LedEffect> effect;
 
     class MutateTo : public LedEffect {
     public:
@@ -161,16 +159,16 @@ class LedStripe {
 
 public:
     LedStripe(uint32_t pixels, const std::function<uint32_t(void)>& millis_) : 
-        NUMPIXELS(pixels), millis(millis_) { 
+        NUMPIXELS(pixels), millis(millis_), effect(new Still()) { 
         currLedStripe.resize(NUMPIXELS * 4, 0);
     }
 
     void runLedStripeEffect(uint32_t mainClr, const std::vector<uint32_t>& blinks, uint32_t periodMs) {
-        effect = new NewYear(currLedStripe, mainClr, blinks, periodMs, millis);
+        effect.reset(new NewYear(currLedStripe, mainClr, blinks, periodMs, millis));
     }
 
     void set(const std::vector<uint32_t>& colors, int periodMs) {
-        effect = new MutateTo(currLedStripe, colors, periodMs, millis);
+        effect.reset(new MutateTo(currLedStripe, colors, periodMs, millis));
     }
 
     uint32_t getPixelCount() const {
@@ -184,14 +182,10 @@ public:
             (currLedStripe[i * 4 + 3] << 0);
     }
 
-    bool inProgress() const {
-        return effect != &STILL;
-    }
-
     bool update() {
         bool up = effect->update(currLedStripe);
         if (effect->finished()) {
-            effect = &STILL;
+            effect.reset(new Still());
             return true;
         }
         return up;

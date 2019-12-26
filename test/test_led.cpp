@@ -26,7 +26,6 @@ void printLed(const LedStripe& l) {
     for (auto i = 0; i < l.getPixelCount(); ++i) {
         printf("%08x ", l.getPixel(i));
     }
-    printf("\n%s\n", l.inProgress() ? "in progress" : "finished");
 
     printf("\n");
 }

@@ -355,6 +355,7 @@ uint32_t ssdPins[] = {D1, D2, D5, D6};
 #endif
 
 LedStripe* ledStripe = NULL;
+uint32_t lastLedStripeUpdate = 0;
 
 void ICACHE_RAM_ATTR handleInterrupt() { interruptCounter++; }
 
@@ -1199,7 +1200,8 @@ void loop() {
 #endif
 
     // Led stripe
-    if (ledStripe != NULL && ledStripe->inProgress()) {
+    if (ledStripe != NULL && (millis() - lastLedStripeUpdate) > 20 ) {
+        lastLedStripeUpdate = millis();
         if (ledStripe->update()) {
 			for (size_t i = 0; i < ledStripe->getPixelCount(); i++) {
 				uint32_t v = ledStripe->getPixel(i);
