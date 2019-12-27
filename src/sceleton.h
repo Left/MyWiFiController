@@ -77,14 +77,63 @@ public:
     const char* _jsonName;
     const char* _description;
     String _value;
-    boolean _password;
+    bool _password;
 
-    DevParam(const char* name, const char* jsonName, const char* description, String value, boolean pwd=false) :
+    DevParam(const char* name, const char* jsonName, const char* description, String value, bool pwd=false) :
         _name(name),
         _jsonName(jsonName),
         _description(description),
         _value(value),
         _password(pwd) {
+    }
+
+    virtual void renderHTML(String& content) {
+        content += "<label class='lbl'>";
+            content += _description;
+            content += ":</label>";
+        content +="<input name='";
+            content += _name;
+            content += "' value='";
+            content += _password ? String("") : _value;
+            content += "' length=32/><br/>";
+    }
+
+    virtual bool parseHTML(const String& val) {
+        // Param is set
+        if (!_password || val.length() > 0) {
+            if (_value != val) {
+                _value = val;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    virtual ~DevParam() {}
+};
+
+class BoolDevParam : public DevParam {
+public:
+    BoolDevParam(const char* name, const char* jsonName, const char* description, bool value) :
+        DevParam(name, jsonName, description, value ? "true" : "false", false) {
+    }
+
+    virtual void renderHTML(String& content) {
+        content += "<label class='lbl'>";
+        content += "<input type='checkbox' ";
+        if (_value == "true") {
+            content += " checked";
+        }
+        content += " name='";
+        content += _name;
+        content += "'";
+        content += "/>";
+        content += _description;
+        content += "</label><br/>";
+    }
+
+    virtual bool parseHTML(const String& val) {
+        return DevParam::parseHTML(val == "on" ? "true" : "false");
     }
 };
 
@@ -105,34 +154,34 @@ DevParam deviceNameRussian("device.name.russian", "rname", "Device Name (russian
 //DevParam deviceNameRussian("device.name.russian", "rname", "Device Name (russian)", String("Реле на кухне"));
 DevParam wifiName("wifi.name", "wifi", "WiFi SSID", SSID_STRING);
 DevParam wifiPwd("wifi.pwd", "wfpwd", "WiFi Password", PASS_STRING, true);
-DevParam logToHardwareSerial("debug.to.serial", "debugserial", "Print debug to serial", "true");
+BoolDevParam logToHardwareSerial("debug.to.serial", "debugserial", "Print debug to serial", true);
 DevParam websocketServer("websocket.server", "ws", "WebSocket server", "192.168.121.38");
 DevParam websocketPort("websocket.port", "wsport", "WebSocket port", "8080");
-DevParam invertRelayControl("invertRelay", "invrelay", "Invert relays", "false");
+BoolDevParam invertRelayControl("invertRelay", "invrelay", "Invert relays", false);
 #ifndef ESP01
-DevParam hasScreen("hasScreen", "screen", "Has screen", "false");
-DevParam hasScreen180Rotated("hasScreen180Rotated", "screen180", "Screen is rotated on 180", "false");
-DevParam hasHX711("hasHX711", "hx711", "Has HX711 (weight detector)", "false");
-DevParam hasIrReceiver("hasIrReceiver", "ir", "Has infrared receiver", "false");
-DevParam hasDS18B20("hasDS18B20", "ds18b20", "Has DS18B20 (temp sensor)", "false");
-DevParam hasDFPlayer("hasDFPlayer", "dfplayer", "Has DF player", "false");
+BoolDevParam hasScreen("hasScreen", "screen", "Has screen", false);
+BoolDevParam hasScreen180Rotated("hasScreen180Rotated", "screen180", "Screen is rotated on 180", false);
+BoolDevParam hasHX711("hasHX711", "hx711", "Has HX711 (weight detector)", false);
+BoolDevParam hasIrReceiver("hasIrReceiver", "ir", "Has infrared receiver", false);
+BoolDevParam hasDS18B20("hasDS18B20", "ds18b20", "Has DS18B20 (temp sensor)", false);
+BoolDevParam hasDFPlayer("hasDFPlayer", "dfplayer", "Has DF player", false);
 #endif
-DevParam hasBME280("hasBME280", "bme280", "Has BME280 (temp & humidity sensor)", "false");
-DevParam hasLedStripe("hasLedStripe", "ledstrip", "Has RGBW Led stripe", "false");
-DevParam hasBluePill("hasBluePill", "bluepill", "Has bluepill", "false");
+BoolDevParam hasBME280("hasBME280", "bme280", "Has BME280 (temp & humidity sensor)", false);
+BoolDevParam hasLedStripe("hasLedStripe", "ledstrip", "Has RGBW Led stripe", false);
+BoolDevParam hasBluePill("hasBluePill", "bluepill", "Has bluepill", false);
 #ifndef ESP01
-DevParam hasButton("hasButton", "d7btn", "Has button on D7", "false");
+BoolDevParam hasButton("hasButton", "d7btn", "Has button on D7", false);
 DevParam brightness("brightness", "bright", "Brightness [0..100]", "0");
-DevParam hasEncoders("hasEncoders", "enc", "Has encoders", "false");
-DevParam hasMsp430("hasMsp430WithEncoders", "msp430", "Has MSP430 with encoders", "false");
-DevParam hasPotenciometer("hasPotenciometer", "potent", "Has ADC connected", "false");
-DevParam hasSolidStateRelay("hasSSR", "ssr", "Has Solid State Relay (D1, D2, D5, D6)", "false");
-DevParam hasATXPowerSupply("hasATXPowerSupply", "atx", "Has ATX power supply", "false");
+BoolDevParam hasEncoders("hasEncoders", "enc", "Has encoders", false);
+BoolDevParam hasMsp430("hasMsp430WithEncoders", "msp430", "Has MSP430 with encoders", false);
+BoolDevParam hasPotenciometer("hasPotenciometer", "potent", "Has ADC connected", false);
+BoolDevParam hasSolidStateRelay("hasSSR", "ssr", "Has Solid State Relay (D1, D2, D5, D6)", false);
+BoolDevParam hasATXPowerSupply("hasATXPowerSupply", "atx", "Has ATX power supply", false);
 #endif
 DevParam relayNames("relay.names", "relays", "Relay names, separated by ;", "");
 //DevParam relayNames("relay.names", "relays", "Relay names, separated by ;", "Потолок;Лента");
-DevParam hasGPIO1Relay("hasGPIO1Relay", "gpio1relay", "Has GPIO1 Relay", "false");
-DevParam hasPWMOnD0("hasPWMOnD0", "pwmOnD0", "Has PWM on D0", "false");
+BoolDevParam hasGPIO1Relay("hasGPIO1Relay", "gpio1relay", "Has GPIO1 Relay", false);
+BoolDevParam hasPWMOnD0("hasPWMOnD0", "pwmOnD0", "Has PWM on D0", false);
 DevParam secondsBeforeRestart("secondsBeforeRestart", "watchdog", "Seconds before restart", "60000");
 
 uint32_t msBeforeRestart = atoi(secondsBeforeRestart._value.c_str());
@@ -369,15 +418,11 @@ void setup(Sink* _sink) {
     setupServer->on("/http_settup", [](AsyncWebServerRequest *request) {
         bool needReboot = false;
         for (DevParam* d : devParams) {
-            if (request->hasParam(d->_name)) {
-                // Param is set
-                String val = request->getParam(d->_name)->value();
-                if (!d->_password || val.length() > 0) {
-                    if (d->_value != val) {
-                        d->_value = val;
-                        needReboot = true;
-                    }
-                }
+            auto p = request->getParam(d->_name);
+            if (p != nullptr) {
+                needReboot = needReboot || d->parseHTML(p->value());
+            } else {
+                needReboot = needReboot || d->parseHTML("");
             }
         }
         
@@ -398,14 +443,7 @@ void setup(Sink* _sink) {
         content += "<p>";
         content += "<form method='get' action='http_settup'>";
         for (DevParam* d : devParams) {
-            content += "<label class='lbl'>";
-                content += d->_description;
-                content += ":</label>";
-            content +="<input name='";
-                content += d->_name;
-                content += "' value='";
-                content += d->_password ? String("") : d->_value;
-                content += "' length=32/><br/>";
+            d->renderHTML(content);
         }
         content += "<input type='submit'></form>";
         content += "<form action='/reboot'><input type='submit' value='Reboot'/></form>";
@@ -464,8 +502,14 @@ int32_t lastLoop = millis();
 uint32_t oldStatus = WiFi.status();
 uint32_t nextReconnect = millis();
 uint32_t nextWiFiScan = millis();
+uint32_t lastDot = millis();
 
 void loop() {
+    if (millis() - lastDot >= 100) {
+        lastDot = millis();
+        debugSerial->print(",");
+    }
+
     if (millis() - lastLoop > 50) {
          debugSerial->println(String("Long loop: ") + String(millis() - lastLoop, DEC));
     }
@@ -482,7 +526,7 @@ void loop() {
         debugSerial->println("Start scanning");
         WiFi.scanNetworks(true);
 
-        nextWiFiScan = millis() + 10000; // Scan every 10 seconds
+        nextWiFiScan = millis() + 60000; // Scan every 10 seconds
     }
 
     int n = WiFi.scanComplete();
