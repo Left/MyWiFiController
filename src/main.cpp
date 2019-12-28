@@ -62,230 +62,16 @@ struct Remote {
         : name(_name), keys(_keys) {}
 };
 
-const Remote tvtuner(
-    "tvtuner",
-    std::vector<Key>{
-        Key("101000000000101010001000101000001000000000000010001010101", "n0"),
-        Key("1010000000001010100010001010001000000000000000001010101010", "n1"),
-        Key("1010000000001010100010001010001010001000000000000010001010101",
-            "n2"),
-        Key("10100000000010101000100010100010100010100000000000100000101010",
-            "n3"),
-        Key("10100000000010101000100010100010001000000000000010001010101010",
-            "n4"),
-        Key("1010000000001010100010001010001000001000000000001010001010", "n5"),
-        Key("1010000000001010100010001010001000100010000000001000100010101",
-            "n6"),
-        Key("10100000000010101000100010100000101000000000001000001010101",
-            "n7"),
-        Key("1010000000001010100010001010000010001000000000100010001010", "n8"),
-        Key("1010000000001010100010001010000010000010000000100010100010101",
-            "n9"),
-
-        Key("1010000000001010100010001010001010000000000000000010101", "tvfm"),
-        Key("10100000000010101000100010100010101000000000000000001010101",
-            "source"),
-        Key("10100000000010101000100010100000001010100000001010000000101010",
-            "scan"),
-        Key("10100000000010101000100010100000101010100000001000000000101010",
-            "power"),
-        Key("10100000000010101000100010100010100000100000000000101000101",
-            "recall"),
-        Key("1010000000001010100010001010000000000010000000101010100010101",
-            "plus_100"),
-        Key("1010000000001010100010001010001010101010000000000000000010101",
-            "channel_up"),
-        Key("1010000000001010100010001010001010100010000000000000100010101",
-            "channel_down"),
-        Key("1010000000001010100010001010000010100010000000100000100010101",
-            "volume_up"),
-        Key("1010000000001010100010001010000000100010000000101000100010101",
-            "volume_down"),
-        Key("1010000000001010100010001010000000001010000000101010000010101",
-            "mute"),
-        Key("1010000000001010100010001010001000000010000000001010100010101",
-            "play"),
-        Key("1010000000001010100010001010000000001000000000101010001010101",
-            "stop"),
-        Key("1010000000001010100010001010000000000000000000101010101010101",
-            "record"),
-        Key("1010000000001010100010001010000010001010000000100010000010101",
-            "freeze"),
-        Key("1010000000001010100010001010001000001010000000001010000010101",
-            "zoom"),
-        Key("1010000000001010100010001010000000100000000000101000101010101",
-            "rewind"),
-        Key("1010000000001010100010001010000010101000000000100000001010101",
-            "function"),
-        Key("1010000000001010100010001010000000101000000000101000001010101",
-            "wind"),
-        Key("1010000000001010100010001010001000101000000000001000001010101",
-            "mts"),
-        Key("10100000000010101000100010100010001010100000000010000000101010",
-            "reset"),
-        Key("10100000000010101000100010100010101010000000000000000010101010",
-            "min")});
-
-const Remote canonCamera(
-    "CanonCamera",
-    std::vector<Key>{
-        Key("01010000000000010101000000010101010100000000000000000101010101010",
-            "power"),
-        Key("01010000000000010101000000010101000000000101000001010101000001010",
-            "photo"),
-        Key("01010000000000010101000000010101000001010100000001010000000101010",
-            "volume_up"),
-        Key("01010000000000010101000000010101010001010100000000010000000101010",
-            "volume_down"),
-        Key("01010000000000010101000000010101000101000000010001000001010100010",
-            "func"),
-        Key("01010000000000010101000000010101010001000001000000010001010001010",
-            "menu"),
-        Key("01010000000000010101000000010101000000010000010001010100010100010",
-            "playlist"),
-        Key("01010000000000010101000000010101000000000001000001010101010001010",
-            "up"),
-        Key("01010000000000010101000000010101010100000001000000000101010001010",
-            "left"),
-        Key("01010000000000010101000000010101000100000001000001000101010001010",
-            "right"),
-        Key("01010000000000010101000000010101010000000001000000010101010001010",
-            "down"),
-        Key("01010000000000010101000000010101000001000001000001010001010001010",
-            "set"),
-        Key("01010000000000010101000000010101000000000100010001010101000100010",
-            "prev"),
-        Key("01010000000000010101000000010101000000000100000001010101000101010",
-            "next"),
-        Key("01010000000000010101000000010101010100010000010000000100010100010",
-            "rewind"),
-        Key("01010000000000010101000000010101010001010000010000010000010100010",
-            "forward"),
-        Key("01010000000000010101000000010101010000000000000000010101010101010",
-            "play"),
-        Key("01010000000000010101000000010101000001000000000001010001010101010",
-            "pause"),
-        Key("01010000000000010101000000010101010101000100000000000001000101010",
-            "stop"),
-        Key("01010000000000010101000000010101000101010000010001000000010100010",
-            "disp"),
-    });
-
-const Remote prologicTV(
-    "prologicTV",
-    std::vector<Key>{
-        Key("00000000000000000101010101010101010001010000010000010000010100010",
-            "power"),
-        Key("00000000000000000101010101010101000101000100000001000001000101010",
-            "mute"),
-        Key("00000000000000000101010101010101010000010000000000010100010101010",
-            "n1"),
-        Key("00000000000000000101010101010101010001010100000000010000000101010",
-            "n2"),
-        Key("00000000000000000101010101010101010101010100000000000000000101010",
-            "n3"),
-        Key("00000000000000000101010101010101010001010000000000010000010101010",
-            "n4"),
-        Key("00000000000000000101010101010101010000010100000000010100000101010",
-            "n5"),
-        Key("00000000000000000101010101010101010100010100000000000100000101010",
-            "n6"),
-        Key("00000000000000000101010101010101010000000100000000010101000101010",
-            "n7"),
-        Key("00000000000000000101010101010101010001000100000000010001000101010",
-            "n8"),
-        Key("00000000000000000101010101010101010101000100000000000001000101010",
-            "n9"),
-        Key("00000000000000000101010101010101000100000100000001000101000101010",
-            "n0"),
-        Key("00000000000000000101010101010101000000000000010001010101010100010",
-            "fullscreen"),
-        Key("00000000000000000101010101010101000100010000000001000100010101010",
-            "volume_down"),
-        Key("00000000000000000101010101010101000101010100000001000000000101010",
-            "volume_up"),
-        Key("00000000000000000101010101010101010001000000000000010001010101010",
-            "channel_up"),
-        Key("00000000000000000101010101010101000100000000000001000101010101010",
-            "channel_down"),
-        Key("00000000000000000101010101010101000001000100000001010001000101010",
-            "ent"),
-        Key("00000000000000000101010101010101000001010000010001010000010100010",
-            "record"),
-        Key("00000000000000000101010101010101000001000100010001010001000100010",
-            "av_source"),
-        Key("00000000000000000101010101010101000000000100000001010101000101010",
-            "stop"),
-        Key("00000000000000000101010101010101000001010000000001010000010101010",
-            "time_shift"),
-        Key("00000000000000000101010101010101000001010100000001010000000101010",
-            "clear")});
-
-const Remote transcendPhotoFrame(
-    "transcendPhotoFrame",
-    std::vector<Key>{
-        Key("00000000000101000001010101000001000100000000000001000101010101010",
-            "power"),
-        Key("00000000000101000001010101000001010101000100000000000001000101010",
-            "home"),
-        Key("00000000000101000001010101000001000001000100010001010001000100010",
-            "photo"),
-        Key("00000000000101000001010101000001010001000100010000010001000100010",
-            "music"),
-        Key("00000000000101000001010101000001000101000100010001000001000100010",
-            "calendar"),
-        Key("00000000000101000001010101000001010000000000000000010101010101010",
-            "settings"),
-        Key("00000000000101000001010101000001000101000000000001000001010101010",
-            "slideshow"),
-        Key("00000000000101000001010101000001010101000100010000000001000100010",
-            "option"),
-        Key("00000000000101000001010101000001010100010100000000000100000101010",
-            "exit"),
-        Key("00000000000101000001010101000001000001000000000001010001010101010",
-            "rotate"),
-        Key("00000000000101000001010101000001000100010100000001000100000101010",
-            "zoom"),
-        Key("00000000000101000001010101000001010100010100010000000100000100010",
-            "ok"),
-        Key("00000000000101000001010101000001000000010100000001010100000101010",
-            "left"),
-        Key("00000000000101000001010101000001010000010100000000010100000101010",
-            "right"),
-        Key("00000000000101000001010101000001000000010100010001010100000100010",
-            "up"),
-        Key("00000000000101000001010101000001000100010100010001000100000100010",
-            "down"),
-        Key("00000000000101000001010101000001010001000000000000010001010101010",
-            "volume_up"),
-        Key("00000000000101000001010101000001000101010100000001000000000101010",
-            "volume_down"),
-        Key("00000000000101000001010101000001000001010100000001010000000101010",
-            "prev"),
-        Key("00000000000101000001010101000001010001010100000000010000000101010",
-            "next"),
-        Key("00000000000101000001010101000001000101010000000001000000010101010",
-            "play"),
-        Key("00000000000101000001010101000001010101010100000000000000000101010",
-            "mode"),
-        Key("00000000000101000001010101000001010001010000000000010000010101010",
-            "stop"),
-        Key("00000000000101000001010101000001000100000100000001000101000101010",
-            "mute")});
-
 const Remote* remotes[] = {
-	&tvtuner, 
-	&canonCamera, 
-	&prologicTV,
-	&transcendPhotoFrame
 };
 
-uint64_t lastIRChange = 0;
-std::vector<uint16_t> ir;
+int64_t lastIRChange = 0;
+std::vector<uint32_t> ir;
 
 static void ICACHE_RAM_ATTR irIRQHandler() { 
-    ir.push_back(micros() - lastIRChange);
-    lastIRChange = micros();
+    unsigned long m = micros();
+    ir.push_back(m - lastIRChange);
+    lastIRChange = m;
 }
 #endif
 
@@ -515,9 +301,9 @@ void setup() {
                 currRelayState = currRelayState | bit;
             }
 #ifndef ESP01
-            if (sceleton::hasSolidStateRelay._value == "true") {
+            if (sceleton::hasSolidStateRelay.isSet()) {
                 if (id >= 0 && id < 4) {
-                    bool invert = sceleton::invertRelayControl._value == "true";
+                    bool invert = sceleton::invertRelayControl.isSet();
                     digitalWrite(ssdPins[id], val ? (invert ? 0 : 1) : (invert ? 1 : 0));
                 }
             } else {
@@ -539,13 +325,13 @@ void setup() {
                 }
 
                 relay->write('0' |
-                             (sceleton::invertRelayControl._value == "true"
+                             (sceleton::invertRelayControl.isSet()
                                   ? ~currRelayState
                                   : currRelayState));
 #ifndef ESP01
             }
 #endif
-            if (sceleton::hasGPIO1Relay._value == "true") {
+            if (sceleton::hasGPIO1Relay.isSet()) {
                 digitalWrite(D4, val);
             }
         }
@@ -661,7 +447,7 @@ void setup() {
 
     sceleton::setup(new SinkImpl());
 
-    if (sceleton::hasLedStripe._value == "true") {
+    if (sceleton::hasLedStripe.isSet()) {
 		ledStripe = new LedStripe(NUMPIXELS, [=]() { return millis(); });
         stripe = new Adafruit_NeoPixel(NUMPIXELS, 0, NEO_GRBW + NEO_KHZ800);
         stripe->begin();
@@ -675,7 +461,7 @@ void setup() {
     }
 
 #ifndef ESP01
-    if (sceleton::hasIrReceiver._value == "true") {
+    if (sceleton::hasIrReceiver.isSet()) {
         /*
         irrecv = new IRrecv(D2);
         irrecv->enableIRIn();  // Start the receiver
@@ -686,7 +472,7 @@ void setup() {
 #endif
 
 #ifndef ESP01
-    if (sceleton::hasDS18B20._value == "true") {
+    if (sceleton::hasDS18B20.isSet()) {
         oneWire = new OneWire(D1);
 
         oneWire->reset_search();
@@ -695,7 +481,7 @@ void setup() {
 #endif
 
 #ifndef ESP01
-    if (sceleton::hasDFPlayer._value == "true") {
+    if (sceleton::hasDFPlayer.isSet()) {
         debugSerial->println("Init DFPlayer Mini");
         dfplayerSerial = new SoftwareSerial(D1, D0);  // RX, TX
         dfplayerSerial->begin(9600);
@@ -703,7 +489,7 @@ void setup() {
     }
 #endif
 
-    if (sceleton::hasBME280._value == "true") {
+    if (sceleton::hasBME280.isSet()) {
         Wire.begin(D4, D3);
         Wire.setClock(100000);
 
@@ -720,7 +506,7 @@ void setup() {
     }
 
 #ifndef ESP01
-    if (sceleton::hasHX711._value == "true") {
+    if (sceleton::hasHX711.isSet()) {
         hx711 = new Q2HX711(D5, D6);
     }
 #endif
@@ -728,18 +514,18 @@ void setup() {
     // Initialize comms hardware
     // pinMode(BEEPER_PIN, OUTPUT);
 #ifndef ESP01
-    if (sceleton::hasScreen._value == "true") {
+    if (sceleton::hasScreen.isSet()) {
         screenController = new MAX72xx(
-            screen, D5, D7, D6, sceleton::hasScreen180Rotated._value == "true");
+            screen, D5, D7, D6, sceleton::hasScreen180Rotated.isSet());
         screenController->setup();
     }
 
-    if (sceleton::hasButton._value == "true") {
+    if (sceleton::hasButton.isSet()) {
         pinMode(D7, INPUT_PULLUP);
         attachInterrupt(digitalPinToInterrupt(D7), handleInterrupt, CHANGE);
     }
 
-    if (sceleton::hasEncoders._value == "true") {
+    if (sceleton::hasEncoders.isSet()) {
         // if (false) {
         for (size_t i = 0; i < __countof(encoders); ++i) {
             encoders[i].init();
@@ -748,19 +534,19 @@ void setup() {
         debugSerial->println("PINS initialized");
     }
 
-    if (sceleton::hasPotenciometer._value == "true") {
+    if (sceleton::hasPotenciometer.isSet()) {
         nextPotentiometer = millis() + 100;
     }
 
-    if (sceleton::hasSolidStateRelay._value == "true") {
-        bool invert = sceleton::invertRelayControl._value == "true";
+    if (sceleton::hasSolidStateRelay.isSet()) {
+        bool invert = sceleton::invertRelayControl.isSet();
         for (size_t i = 0; i < __countof(ssdPins); ++i) {
             pinMode(ssdPins[i], OUTPUT);
             digitalWrite(ssdPins[i], invert ? 1 : 0);
         }
     }
 
-    if (sceleton::hasMsp430._value == "true") {
+    if (sceleton::hasMsp430.isSet()) {
         msp430 = new SoftwareSerial(D1, D0);  // RX, TX
         msp430->begin(9600);
         debugSerial->println("Initialized MSP430");
@@ -768,13 +554,13 @@ void setup() {
         digitalWrite(D2, 1);
     }
 
-    if (sceleton::hasATXPowerSupply._value == "true") {
+    if (sceleton::hasATXPowerSupply.isSet()) {
         pinMode(D8, OUTPUT);
         digitalWrite(D8, 1); // 1 means DOWN
         pinMode(D2, INPUT);
     }
 #endif
-    if (sceleton::hasPWMOnD0._value == "true") {
+    if (sceleton::hasPWMOnD0.isSet()) {
         analogWriteFreq(21000);
         analogWriteRange(1024);
 
@@ -791,13 +577,13 @@ void setup() {
         digitalWrite(D5, 1);
     }
 
-    if (sceleton::hasGPIO1Relay._value == "true") {
+    if (sceleton::hasGPIO1Relay.isSet()) {
     }
 
-    if (sceleton::hasBluePill._value == "true") {
+    if (sceleton::hasBluePill.isSet()) {
         debugSerial = new sceleton::DummySerial();
 
-        udpClient.begin(sceleton::websocketPort._value.toInt() + 1);
+        udpClient.begin(atoi(sceleton::websocketPort.value()) + 1);
         Serial.begin(460800);
     }
 }
@@ -858,7 +644,7 @@ void loop() {
     }
 
 #ifndef ESP01
-    if (sceleton::hasHX711._value == "true" &&
+    if (sceleton::hasHX711.isSet() &&
         (millis() - lastWeighteningStarted) > 100 && hx711->readyToSend()) {
         debugSerial->println("3");
         lastWeighteningStarted = millis();
@@ -990,75 +776,33 @@ void loop() {
 #endif
 
 #ifndef ESP01
-    if (micros() - lastIRChange > 75000 && ir.size() > 0) {
-        if (ir.size() > 30) {
-            int decodedLen = 0;
-            char decoded[300] = {0};
-            for (size_t i = 0; i < ir.size() && i < sizeof(decoded);
-                    ++i) {
-                char c = -1;
-                uint16_t val = ir[i];
-                bool skip = false;
-
-                if (val > 5000) {
-                    skip = true;
-                } else if (val > 150 && val < 900) {
-                    c = '0';
-                } else if (val > 900 && val < 3000) {
-                    c = '1';
-                } else {
-                    skip = true;
+    if (sceleton::hasIrReceiver.isSet()) {
+        auto irPause = (int64_t)micros() - lastIRChange;
+        if (irPause > 200000 && ir.size() > 0) {
+            String decoded = "";
+            // We intentionally skip the very first period, because it is a pause between keys
+            for (size_t i = 1; i < ir.size(); ++i) {
+                if (decoded.length() > 0) {
+                    decoded += ",";
                 }
-                // debugSerial->print(String(val, DEC));
-                // debugSerial->print(" ");
-
-                if (!skip) {
-                    decoded[decodedLen++] = c;
-                }
-            }
-            debugSerial->println();
-
-            String decodedStr(decoded);
-            const Remote* recognizedRemote = NULL;
-            const Key* recognized = NULL;
-            for (size_t r = 0; r < __countof(remotes); ++r) {
-                const Remote& remote = *(remotes[r]);
-                for (size_t k = 0; k < remote.keys.size(); ++k) {
-                    if (decodedStr.indexOf(remote.keys[k].bin) != -1) {
-                        // Key pressed!
-                        recognized = &(remote.keys[k]);
-                        // debugSerial->println(String(recognized->value));
-
-                        recognizedRemote = &remote;
-
-                        String keyVal(remote.keys[k].value);
-                        debugSerial->println(keyVal);
-
-                        String toSend =
-                            String("{ \"type\": \"ir_key\", ") +
-                            "\"remote\": \"" +
-                            String(recognizedRemote->name) + "\", " +
-                            "\"key\": \"" + keyVal + "\", " +
-                            "\"timeseq\": " + String(millis(), DEC) + " " +
-                            "}";
-
-                        if (sceleton::webSocketClient.get() != NULL) {
-                            sceleton::send(toSend);
-                        }
-
-                        break;
-                    }
-                }
+                decoded += String(ir[i], DEC);
             }
 
-            if (recognized == NULL) {
-                debugSerial->println("Unrecognized");
+            String toSend =
+                String("{ \"type\": \"raw_ir_key\", ") +
+                "\"periods\": [" + decoded + "], " +
+                "\"timeseq\": " + String(millis(), DEC) + " " +
+                "}";
+
+            if (sceleton::webSocketClient.get() != NULL) {
+                sceleton::send(toSend);
             }
+
             ir.clear();
         }
     }
 
-    if (sceleton::hasMsp430._value == "true" && msp430 != NULL &&
+    if (sceleton::hasMsp430.isSet() && msp430 != NULL &&
         sceleton::webSocketClient.get() != NULL) {
         for (; msp430->available() > 0;) {
             int ch = msp430->read();
@@ -1147,7 +891,7 @@ void loop() {
     }
     Encoder::cont();
 
-    if (sceleton::hasPotenciometer._value == "true" &&
+    if (sceleton::hasPotenciometer.isSet() &&
         (nextPotentiometer < millis())) {
         nextPotentiometer = millis() + 50;
         int readingIn = analogRead(A0);
@@ -1178,7 +922,7 @@ void loop() {
 #endif
 
 #ifndef ESP01
-    if (sceleton::hasDFPlayer._value == "true") {
+    if (sceleton::hasDFPlayer.isSet()) {
         if (millis() - lastReadDFBusy > 200) {
             lastReadDFBusy = millis();
             uint32_t dfBusy = (uint32_t)digitalRead(D3);
@@ -1212,7 +956,7 @@ void loop() {
 		}
     }
 
-    if (sceleton::hasPWMOnD0._value == "true") {
+    if (sceleton::hasPWMOnD0.isSet()) {
         const uint32_t n = millis();
         for (size_t i = 0; i < __countof(pwmStates); ++i) {
             PWMState& pwm = pwmStates[i];
@@ -1247,7 +991,7 @@ void loop() {
         }
     }
 
-    if (sceleton::hasBluePill._value == "true") {
+    if (sceleton::hasBluePill.isSet()) {
         size_t avail = Serial.available();
         if (avail > 0) {
             size_t olds = protobuf.size();
@@ -1264,8 +1008,8 @@ void loop() {
             
             if ((startSeq != bufferEnd) && (endSeq != bufferEnd)) {               
                 udpClient.beginPacket(
-                    sceleton::websocketServer._value.c_str(), 
-                    sceleton::websocketPort._value.toInt() + 1);
+                    sceleton::websocketServer.value(), 
+                    atoi(sceleton::websocketPort.value()) + 1);
                 for (const uint8_t* p = startSeq + __countof(bluePillPacketStart);
                     p != endSeq; ++p) {
                     udpClient.write(*p);
@@ -1285,7 +1029,7 @@ void loop() {
 
 #ifndef ESP01
     if (millis() % 500 == 12) {
-        if (sceleton::hasATXPowerSupply._value == "true") {
+        if (sceleton::hasATXPowerSupply.isSet()) {
             int currAtxState = digitalRead(D2);
             if (oldPowerState != currAtxState) {
                 oldPowerState = currAtxState;
