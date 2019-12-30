@@ -75,8 +75,8 @@ static void ICACHE_RAM_ATTR irIRQHandler() {
 }
 #endif
 
-uint8_t bluePillPacketStart[] = {0x80, 0x1d, 0x7d, 0x2e, 0x00, 0x03, 0xb9, 0x13 };
-uint8_t bluePillPacketEnd[] = {0xff, 0x5b, 0xa1, 0x35, 0x33, 0x6f, 0xf5, 0x37 };
+uint8_t bluePillPacketStart[] PROGMEM = {0x80, 0x1d, 0x7d, 0x2e, 0x00, 0x03, 0xb9, 0x13 };
+uint8_t bluePillPacketEnd[] PROGMEM = {0xff, 0x5b, 0xa1, 0x35, 0x33, 0x6f, 0xf5, 0x37 };
 
 std::vector<uint8_t> protobuf;
 
@@ -137,7 +137,7 @@ int32_t reportedAnalogValue = -1;
 
 int oldPowerState = -1;
 
-uint32_t ssdPins[] = {D1, D2, D5, D6};
+uint32_t ssdPins[] PROGMEM = {D1, D2, D5, D6};
 #endif
 
 LedStripe* ledStripe = NULL;
@@ -181,7 +181,7 @@ void uint16ToArray(uint16_t value, uint8_t* array) {
 }
 
 void dfPlayerSend(uint8_t command, uint16_t argument) {
-    debugSerial->print("dfPlayerSend:");
+    debugSerial->print(String(F("dfPlayerSend:")));
     debugSerial->print(argument);
     debugSerial->println();
 
@@ -193,7 +193,7 @@ void dfPlayerSend(uint8_t command, uint16_t argument) {
     uint16ToArray(argument, _sending + Stack_Parameter);
     uint16ToArray(calculateCheckSum(_sending), _sending + Stack_CheckSum);
 
-    debugSerial->print("SENDING to DFplayer:");
+    debugSerial->print(String(F("SENDING to DFplayer:")));
     for (int i = 0; i < DFPLAYER_SEND_LENGTH; ++i) {
         debugSerial->print(String(_sending[i], HEX));
         debugSerial->print(" ");
@@ -201,7 +201,7 @@ void dfPlayerSend(uint8_t command, uint16_t argument) {
     debugSerial->println();
 
     dfplayerSerial->write(_sending, DFPLAYER_SEND_LENGTH);
-    debugSerial->println("SENT");
+    debugSerial->println(String(F("SENT")));
 }
 
 class Encoder {
@@ -215,21 +215,21 @@ class Encoder {
             int pB = digitalRead(pinB);
             int pBtn = digitalRead(pinButton);
 
-            String s = "encoder_";
+            String s = F("encoder_");
             s += encName;
             if (pA != _pA || pB != _pB) {
                 if (_pA == 0 && _pB == 1 && pA == 1 && pB == 1) {
                     String toSend =
-                        String("{ \"type\": \"ir_key\", ") + "\"remote\": \"" +
-                        s + "\", " + "\"key\": \"" + "rotate_cw" + "\", " +
-                        "\"timeseq\": " + String(millis(), DEC) + " " + "}";
+                        String(F("{ \"type\": \"ir_key\", ")) + F("\"remote\": \"") +
+                        s + F("\", ") + F("\"key\": \"") + F("rotate_cw") + F("\", ") +
+                        F("\"timeseq\": ") + String(millis(), DEC) + F(" ") + F("}");
 
                     sceleton::send(toSend);
                 } else if (_pA == 1 && _pB == 0 && pA == 1 && pB == 1) {
                     String toSend =
-                        String("{ \"type\": \"ir_key\", ") + "\"remote\": \"" +
-                        s + "\", " + "\"key\": \"" + "rotate_ccw" + "\", " +
-                        "\"timeseq\": " + String(millis(), DEC) + " " + "}";
+                        String(F("{ \"type\": \"ir_key\", ")) + F("\"remote\": \"") +
+                        s + F("\", ") + F("\"key\": \"") + F("rotate_ccw") + F("\", ") +
+                        F("\"timeseq\": ") + String(millis(), DEC) + F(" ") + F("}");
 
                     sceleton::send(toSend);
                 }
@@ -239,9 +239,9 @@ class Encoder {
             if (pBtn != _pBtn) {
                 if (_pBtn == 0 && pBtn == 1) {
                     String toSend =
-                        String("{ \"type\": \"ir_key\", ") + "\"remote\": \"" +
-                        s + "\", " + "\"key\": \"" + "click" + "\", " +
-                        "\"timeseq\": " + String(millis(), DEC) + " " + "}";
+                        String(F("{ \"type\": \"ir_key\", ")) + F("\"remote\": \"") +
+                        s + F("\", ") + F("\"key\": \"") + F("click") + F("\", ") +
+                        F("\"timeseq\": ") + String(millis(), DEC) + F(" ") + F("}");
 
                     sceleton::send(toSend);
                 }
