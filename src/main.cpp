@@ -66,12 +66,14 @@ const Remote* remotes[] = {
 };
 
 int64_t lastIRChange = 0;
+int32_t lastIRChangeMs = 0;
 std::vector<uint32_t> ir;
 
 static void ICACHE_RAM_ATTR irIRQHandler() { 
     unsigned long m = micros();
     ir.push_back(m - lastIRChange);
     lastIRChange = m;
+    lastIRChangeMs = millis();
 }
 #endif
 
@@ -777,8 +779,8 @@ void loop() {
 
 #ifndef ESP01
     if (sceleton::hasIrReceiver.isSet()) {
-        auto irPause = (int64_t)micros() - lastIRChange;
-        if (irPause > 200000 && ir.size() > 0) {
+        auto irPause = (int64_t)millis() - lastIRChangeMs;
+        if (irPause > 60 && ir.size() > 5) {
             String decoded = "";
             // We intentionally skip the very first period, because it is a pause between keys
             for (size_t i = 1; i < ir.size(); ++i) {
@@ -787,6 +789,9 @@ void loop() {
                 }
                 decoded += String(ir[i], DEC);
             }
+
+            debugSerial->println();
+            debugSerial->println(decoded);
 
             String toSend =
                 String("{ \"type\": \"raw_ir_key\", ") +
