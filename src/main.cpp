@@ -19,10 +19,7 @@
 
 #include <pb_encode.h>
 #include <pb_decode.h>
-#include "../../BluePillTest/src/protocol.pb.h"
-extern "C" {
-    #include "../../BluePillTest/src/protocol.pb.c"
-}
+#include "protocol.pb.h"
 
 unsigned int localPort = 2390;  // local port to listen for UDP packets
 
@@ -464,11 +461,6 @@ void setup() {
 
 #ifndef ESP01
     if (sceleton::hasIrReceiver.isSet()) {
-        /*
-        irrecv = new IRrecv(D2);
-        irrecv->enableIRIn();  // Start the receiver
-        debugSerial->println("IR receiver is initialized");
-        */
        attachInterrupt(digitalPinToInterrupt(D2), irIRQHandler, CHANGE);
     }
 #endif
@@ -581,6 +573,8 @@ void setup() {
 
     if (sceleton::hasGPIO1Relay.isSet()) {
     }
+    
+    udpClient.begin(atoi(sceleton::websocketPort.value()) + 1);
 
     if (sceleton::hasBluePill.isSet()) {
         debugSerial = new sceleton::DummySerial();
@@ -617,6 +611,9 @@ long lastStripeFrame = millis();
 
 long lastLoop = millis();
 long lastLoopEnd = millis();
+
+std::vector<uint8_t> buffer;
+Msg message = Msg_init_zero;
 
 void loop() {
     if (millis() - lastLoop > 50) {
@@ -780,27 +777,56 @@ void loop() {
 #ifndef ESP01
     if (sceleton::hasIrReceiver.isSet()) {
         auto irPause = (int64_t)millis() - lastIRChangeMs;
-        if (irPause > 60 && ir.size() > 5) {
-            String decoded = "";
-            // We intentionally skip the very first period, because it is a pause between keys
-            for (size_t i = 1; i < ir.size(); ++i) {
-                if (decoded.length() > 0) {
-                    decoded += ",";
+
+        if (irPause > 60) {
+            if (ir.size() > 5) {
+                String decoded = "";
+                // We intentionally skip the very first period, because it is a pause between keys
+                for (size_t i = 1; i < ir.size(); ++i) {
+                    if (decoded.length() > 0) {
+                        decoded += ",";
+                    }
+                    decoded += String(ir[i], DEC);
                 }
-                decoded += String(ir[i], DEC);
-            }
 
-            debugSerial->println();
-            debugSerial->println(decoded);
+                String toSend = String("{ \"type\": \"raw_ir_key\", ") +
+                    "\"periods\": [" + decoded + "], " +
+                    "\"timeseq\": " + String(millis(), DEC) + " " +
+                    "}";
 
-            String toSend =
-                String("{ \"type\": \"raw_ir_key\", ") +
-                "\"periods\": [" + decoded + "], " +
-                "\"timeseq\": " + String(millis(), DEC) + " " +
-                "}";
+                if (sceleton::webSocketClient.get() != NULL) {
+                    sceleton::send(toSend);
+                }
 
-            if (sceleton::webSocketClient.get() != NULL) {
-                sceleton::send(toSend);
+                /*
+                String decoded = "";
+                
+                message.id = 22;
+                message.timeseq = millis();
+
+                // We intentionally skip the very first period, because it is a pause between keys
+                for (size_t i = 1; i < ir.size(); ++i) {
+                    message.irKeyPeriods[i - 1] = ir[i];
+                }
+                message.irKeyPeriods_count = ir.size() - 1;
+
+                buffer.resize(4000, 0);
+                pb_ostream_t stream = pb_ostream_from_buffer(&buffer[0], buffer.size());
+                pb_encode(&stream, Msg_fields, &message);
+
+                debugSerial->println("!!!!!!!!!!!");
+                debugSerial->println(String(stream.bytes_written, DEC));
+
+                udpClient.beginPacket(
+                    sceleton::websocketServer.value(), 
+                    atoi(sceleton::websocketPort.value()) + 1);
+                int b = stream.bytes_written;
+                for (const uint8_t* p = &buffer[0];
+                    b > 0; ++p, --b) {
+                    udpClient.write(*p);
+                } 
+                udpClient.endPacket();
+                */
             }
 
             ir.clear();
