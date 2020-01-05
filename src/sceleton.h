@@ -10,7 +10,13 @@
 #include <WebSockets.h>
 #include <WebSocketsClient.h>
 #include <ESPAsyncWebServer.h>
+#include <WiFiUDP.h>
 #include <ArduinoOTA.h>
+
+#include <pb_common.h>
+#include <pb_encode.h>
+#include <pb_decode.h>
+#include "protocol.pb.h"
 
 Stream* debugSerial;
 
@@ -55,20 +61,22 @@ String fileToString(const String& fileName) {
     return String();
 }
 
-const char* typeKey PROGMEM = "type";
-const char* firmwareVersion PROGMEM = "00.22";
+const char* typeKey = "type";
+const uint32_t firmwareVersion[] = { 0, 22, 0 };
 
 std::auto_ptr<AsyncWebServer> setupServer;
-std::auto_ptr<WebSocketsClient> webSocketClient;
+// std::auto_ptr<WebSocketsClient> webSocketClient;
 
-const int dpin[] PROGMEM = { D0, D1, D2, D3, D4, D5, D6, D7, D8, D9 };
+const int dpin[] = { D0, D1, D2, D3, D4, D5, D6, D7, D8, D9 };
 
 long vccVal = 0;
 uint32_t rebootAt = 0x7FFFFFFF;
 
+/*
 void send(const String& toSend) {
     webSocketClient->sendTXT(toSend.c_str(), toSend.length());
 }
+*/
 
 class DevParam {
 protected:
@@ -85,6 +93,10 @@ public:
         _jsonName(jsonName),
         _description(description),
         _password(pwd) {
+    }
+
+    const String& val() const {
+        return _value;
     }
 
     const char* value() {
@@ -167,43 +179,38 @@ public:
 #define PASS_STRING TO_STR(SSID_PASS)
 #define SSID_STRING TO_STR(SSID_NAME)
 
-DevParam deviceName("device.name", "name", "Device Name", String("ESP_") + ESP.getChipId()) PROGMEM;
-//DevParam deviceName("device.name", "name", "Device Name", String("RelayOnKitchen")) PROGMEM;
-DevParam deviceNameRussian("device.name.russian", "rname", "Device Name (russian)", String("ESP_") + ESP.getChipId()) PROGMEM;
-//DevParam deviceNameRussian("device.name.russian", "rname", "Device Name (russian)", String("Реле на кухне")) PROGMEM;
-DevParam wifiName("wifi.name", "wifi", "WiFi SSID", SSID_STRING) PROGMEM;
-DevParam wifiPwd("wifi.pwd", "wfpwd", "WiFi Password", PASS_STRING, true) PROGMEM;
-BoolDevParam logToHardwareSerial("debug.to.serial", "debugserial", "Print debug to serial", true) PROGMEM;
-DevParam websocketServer("websocket.server", "ws", "WebSocket server", "192.168.121.38") PROGMEM;
-DevParam websocketPort("websocket.port", "wsport", "WebSocket port", "8080") PROGMEM;
-BoolDevParam invertRelayControl("invertRelay", "invrelay", "Invert relays", false) PROGMEM;
-#ifndef ESP01
-BoolDevParam hasScreen("hasScreen", "screen", "Has screen", false) PROGMEM;
-BoolDevParam hasScreen180Rotated("hasScreen180Rotated", "screen180", "Screen is rotated on 180", false) PROGMEM;
-BoolDevParam hasHX711("hasHX711", "hx711", "Has HX711 (weight detector)", false) PROGMEM;
-BoolDevParam hasIrReceiver("hasIrReceiver", "ir", "Has infrared receiver", false) PROGMEM;
-BoolDevParam hasDS18B20("hasDS18B20", "ds18b20", "Has DS18B20 (temp sensor)", false) PROGMEM;
-BoolDevParam hasDFPlayer("hasDFPlayer", "dfplayer", "Has DF player", false) PROGMEM;
-#endif
-BoolDevParam hasBME280("hasBME280", "bme280", "Has BME280 (temp & humidity sensor)", false) PROGMEM;
-BoolDevParam hasLedStripe("hasLedStripe", "ledstrip", "Has RGBW Led stripe", false) PROGMEM;
-BoolDevParam hasBluePill("hasBluePill", "bluepill", "Has bluepill", false) PROGMEM;
-#ifndef ESP01
-BoolDevParam hasButton("hasButton", "d7btn", "Has button on D7", false) PROGMEM;
-DevParam brightness("brightness", "bright", "Brightness [0..100]", "0") PROGMEM;
-BoolDevParam hasEncoders("hasEncoders", "enc", "Has encoders", false) PROGMEM;
-BoolDevParam hasMsp430("hasMsp430WithEncoders", "msp430", "Has MSP430 with encoders", false) PROGMEM;
-BoolDevParam hasPotenciometer("hasPotenciometer", "potent", "Has ADC connected", false) PROGMEM;
-BoolDevParam hasSolidStateRelay("hasSSR", "ssr", "Has Solid State Relay (D1, D2, D5, D6)", false) PROGMEM;
-BoolDevParam hasATXPowerSupply("hasATXPowerSupply", "atx", "Has ATX power supply", false) PROGMEM;
-#endif
-DevParam relayNames("relay.names", "relays", "Relay names, separated by ;", "") PROGMEM;
-//DevParam relayNames("relay.names", "relays", "Relay names, separated by ;", "Потолок;Лента") PROGMEM;
-BoolDevParam hasGPIO1Relay("hasGPIO1Relay", "gpio1relay", "Has GPIO1 Relay", false) PROGMEM;
-BoolDevParam hasPWMOnD0("hasPWMOnD0", "pwmOnD0", "Has PWM on D0", false) PROGMEM;
-DevParam secondsBeforeRestart("secondsBeforeRestart", "watchdog", "Seconds before restart", "60000") PROGMEM;
+DevParam deviceName("device.name", "name", "Device Name", String("ESP_") + ESP.getChipId());
+//DevParam deviceName("device.name", "name", "Device Name", String("RelayOnKitchen"));
+DevParam deviceNameRussian("device.name.russian", "rname", "Device Name (russian)", String("ESP_") + ESP.getChipId());
+//DevParam deviceNameRussian("device.name.russian", "rname", "Device Name (russian)", String("Реле на кухне"));
+DevParam wifiName("wifi.name", "wifi", "WiFi SSID", SSID_STRING);
+DevParam wifiPwd("wifi.pwd", "wfpwd", "WiFi Password", PASS_STRING, true);
+BoolDevParam logToHardwareSerial("debug.to.serial", "debugserial", "Print debug to serial", true);
+DevParam websocketServer("websocket.server", "ws", "WebSocket server", "192.168.121.38");
+DevParam websocketPort("websocket.port", "wsport", "WebSocket port", "8080");
+BoolDevParam invertRelayControl("invertRelay", "invrelay", "Invert relays", false);
+BoolDevParam hasScreen("hasScreen", "screen", "Has screen", false);
+BoolDevParam hasScreen180Rotated("hasScreen180Rotated", "screen180", "Screen is rotated on 180", false);
+BoolDevParam hasHX711("hasHX711", "hx711", "Has HX711 (weight detector)", false);
+BoolDevParam hasIrReceiver("hasIrReceiver", "ir", "Has infrared receiver", false);
+BoolDevParam hasDS18B20("hasDS18B20", "ds18b20", "Has DS18B20 (temp sensor)", false);
+BoolDevParam hasDFPlayer("hasDFPlayer", "dfplayer", "Has DF player", false);
+BoolDevParam hasBME280("hasBME280", "bme280", "Has BME280 (temp & humidity sensor)", false);
+BoolDevParam hasLedStripe("hasLedStripe", "ledstrip", "Has RGBW Led stripe", false);
+BoolDevParam hasBluePill("hasBluePill", "bluepill", "Has bluepill", false);
+BoolDevParam hasButton("hasButton", "d7btn", "Has button on D7", false);
+DevParam brightness("brightness", "bright", "Brightness [0..100]", "0");
+BoolDevParam hasEncoders("hasEncoders", "enc", "Has encoders", false);
+BoolDevParam hasMsp430("hasMsp430WithEncoders", "msp430", "Has MSP430 with encoders", false);
+BoolDevParam hasPotenciometer("hasPotenciometer", "potent", "Has ADC connected", false);
+BoolDevParam hasSolidStateRelay("hasSSR", "ssr", "Has Solid State Relay (D1, D2, D5, D6)", false);
+BoolDevParam hasATXPowerSupply("hasATXPowerSupply", "atx", "Has ATX power supply", false);
+DevParam relayNames("relay.names", "relays", "Relay names, separated by ;", "");
+//DevParam relayNames("relay.names", "relays", "Relay names, separated by ;", "Потолок;Лента");
+BoolDevParam hasGPIO1Relay("hasGPIO1Relay", "gpio1relay", "Has GPIO1 Relay", false);
+BoolDevParam hasPWMOnD0("hasPWMOnD0", "pwmOnD0", "Has PWM on D0", false);
 
-uint32_t msBeforeRestart = atoi(secondsBeforeRestart.value());
+// uint32_t msBeforeRestart = atoi(secondsBeforeRestart.value());
 
 DevParam* devParams[] = { 
     &deviceName, 
@@ -214,41 +221,216 @@ DevParam* devParams[] = {
     &websocketServer, 
     &websocketPort, 
     &invertRelayControl, 
-#ifndef ESP01
     &hasScreen, 
     &hasScreen180Rotated,
     &hasHX711,
     &hasIrReceiver,
     &hasDS18B20,
     &hasDFPlayer,
-#endif
     &hasBME280,
     &hasLedStripe,
     &hasBluePill,
-#ifndef ESP01
     &hasEncoders,
     &hasButton, 
     &brightness,
     &hasMsp430,
-#endif
     &relayNames,
     &hasGPIO1Relay,
-#ifndef ESP01
     &hasPotenciometer,
     &hasSolidStateRelay,
     &hasATXPowerSupply,
-#endif
     &hasPWMOnD0,
-    &secondsBeforeRestart
+    // &secondsBeforeRestart
 }; 
+
 Sink* sink = new Sink();
 boolean initializedWiFi = false;
 uint32_t lastReceived = millis();
 uint32_t reconnectWebsocketAt = 0x7FFFFFFF; // Never by def
 uint32_t reportedGoingToReconnect = millis();
 
+uint32_t lastPing = millis();
+
+WiFiUDP udpClient;
+
+std::vector<uint8_t> buffer;
+Msg message_empty = Msg_init_zero;
+Msg message = Msg_init_zero;
+
+MsgBack messageBack_empty = MsgBack_init_zero;
+MsgBack messageBack = MsgBack_init_zero;
+
+int32_t msgId = 1;
+
+bool write_string(pb_ostream_t* stream, const pb_field_t* field, void * const * arg) {
+    const char* str = reinterpret_cast<const char*>(*arg);
+
+    return pb_encode_tag_for_field(stream, field) &&
+        pb_encode_string(stream, (uint8_t*)str, strlen(str));
+}
+
+pb_callback_t str(const String& str) {
+    pb_callback_t res = {};
+    res.arg = reinterpret_cast<void*>(const_cast<char*>(str.c_str()));
+    res.funcs.encode = reinterpret_cast<decltype(res.funcs.encode)>(write_string);
+
+    return res;
+}
+
+bool read_string(pb_istream_t *stream, const pb_field_t *field, void **arg) {
+    size_t byteLen = (stream == nullptr) ? 0 : stream->bytes_left;
+    if (byteLen > 0) {
+        std::vector<uint8_t> buffer(byteLen + 2, 0);
+
+        if (!pb_read(stream, &buffer[0], byteLen)) {
+            return false;
+        }
+
+        String* strRes = reinterpret_cast<String*>(*arg);
+        
+        *strRes = (const char*)(&buffer[0]);
+    }
+
+    return true;
+}
+
+
+pb_callback_t strDecode(String& str) {
+    pb_callback_t res = { 0 };
+    auto strRes = (String*)(&str);
+    res.arg = strRes;
+    res.funcs.decode = reinterpret_cast<decltype(res.funcs.decode)>(read_string);
+
+    return res;
+}
+
+bool write_ints(pb_ostream_t* stream, const pb_field_t* field, void * const * arg) {
+    std::vector<uint32_t>* vec = (std::vector<uint32_t>*)(*arg);
+
+    if (!pb_encode_tag(stream, PB_WT_STRING, field->tag)) {
+        return false;
+    }
+
+    pb_ostream_t sizestream = PB_OSTREAM_SIZING;
+    for (size_t i = 0; i < vec->size(); i++) {
+        if (!pb_encode_varint(&sizestream, vec->at(i))) {
+            return false;
+        }
+    }
+
+    if (!pb_encode_varint(stream, sizestream.bytes_written)) {
+        return false;
+    }
+
+    for (uint32_t v : *vec) {
+        if (!pb_encode_varint(stream, v)) {
+             return false;
+        }
+    }
+    return true;
+}
+
+pb_callback_t repeated_int(const std::vector<uint32_t>& arg) {
+    pb_callback_t res = {};
+    res.arg = (void*)(&arg);
+    res.funcs.decode = reinterpret_cast<decltype(res.funcs.decode)>(write_ints);
+    return res;
+}
+
+void udpSend(std::function<void(Msg&)>&& updateData) {   
+    message = message_empty;
+    message.id = (msgId++);
+    message.timeseq = millis();
+
+    updateData(message);
+/*
+    // We intentionally skip the very first period, because it is a pause between keys
+    for (size_t i = 1; i < ir.size(); ++i) {
+        message.irKeyPeriods[i - 1] = ir[i];
+    }
+    message.irKeyPeriods_count = ir.size() - 1;
+*/
+
+    buffer.resize(1000, 0);
+    pb_ostream_t stream = pb_ostream_from_buffer(&buffer[0], buffer.size());
+    pb_encode(&stream, Msg_fields, &message);
+
+    udpClient.beginPacket(
+        sceleton::websocketServer.value(), 
+        atoi(sceleton::websocketPort.value()) + 1);
+    int b = stream.bytes_written;
+    for (const uint8_t* p = &buffer[0];
+        b > 0; ++p, --b) {
+        udpClient.write(*p);
+    } 
+    udpClient.endPacket();
+}
+
+void sendHelloMsg() {
+    String devParamsStr = F("{ ");
+    bool first = true;
+    for (DevParam* d : devParams) {
+        if (!d->_password && String(d->value()) != F("false")) {
+            if (!first) { 
+                devParamsStr += F(",");
+            }
+            first = false;
+            devParamsStr += F("\""),
+            devParamsStr += d->_name;
+            devParamsStr += F("\": \""),
+            devParamsStr += d->value();
+            devParamsStr += F("\" ");
+        }
+    }
+    devParamsStr += "}";
+
+/*
+    send(String(F("{ ")) +
+        F("\"type\":\"hello\", ") +
+        F("\"devParams\": ") + devParamsStr + F(", ") + 
+        F("\"screenEnabled\": ") + sink->screenEnabled() + F(", ") + 
+        F("\"deviceName\":\"") + sceleton::deviceName.value() + F("\"") + 
+        F(" }"));
+*/
+
+    udpSend([=](Msg& msg) {
+        msg.has_hello = true;
+        msg.hello.settings = str(devParamsStr);
+        msg.hello.versionLast = firmwareVersion[2];
+        msg.hello.versionMinor = firmwareVersion[1];
+        msg.hello.versionMajor = firmwareVersion[0];
+        msg.hello.screenEnabled = sink->screenEnabled();
+    }); 
+
+    int cnt = 0;
+    for (const char* p = sceleton::relayNames.value(); *p != 0; ++p) {
+        if (*p == ';') {
+            if (cnt == 0) {
+                cnt = 1;
+            }
+
+            cnt++;
+        }
+    }
+
+    if (cnt > 0) {
+        sceleton::udpSend([=](Msg& msg) {
+            msg.relayStates_count = cnt;
+            for (int id = 0; id < cnt; ++id) {
+                msg.relayStates[id].id = id;
+                msg.relayStates[id].state = sink->relayState(id);
+            }
+        });
+    }
+}
+
 void reportRelayState(uint32_t id) {
-    send(String(F("{ \"type\": \"relayState\", \"id\": ")) + String(id, DEC) + F(", \"value\":") + (sink->relayState(id) ? F("true") : F("false")) + F(" }"));
+    sceleton::udpSend([=](Msg& msg) {
+        msg.relayStates_count = 1;
+        msg.relayStates[0].id = id;
+        msg.relayStates[0].state = sink->relayState(id);
+    });
+    // send(String(F("{ \"type\": \"relayState\", \"id\": ")) + String(id, DEC) + F(", \"value\":") + (sink->relayState(id) ? F("true") : F("false")) + F(" }"));
 }
 
 void onDisconnect(const WiFiEventStationModeDisconnected& event) {
@@ -363,7 +545,7 @@ void setup(Sink* _sink) {
         debugSerial = new DummySerial();
     }
 
-    msBeforeRestart = atoi(secondsBeforeRestart.value());
+    // msBeforeRestart = atoi(secondsBeforeRestart.value());
 
     debugSerial->println(String(F("Initialized in ")) + String(millis() - was, DEC));
     debugSerial->println(wifiName.value());
@@ -410,6 +592,7 @@ void setup(Sink* _sink) {
         WiFi.begin(wifiName.value(), wifiPwd.value());
         // WiFi.waitForConnectResult();
     }
+
 /*
     if (WiFi.status() == WL_CONNECTED) {
         IPAddress ip = WiFi.localIP();
@@ -438,11 +621,13 @@ void setup(Sink* _sink) {
         bool needReboot = false;
         for (DevParam* d : devParams) {
             auto p = request->getParam(d->_name);
+            auto n = false;
             if (p != nullptr) {
-                needReboot = needReboot || d->parseHTML(p->value());
+                n = d->parseHTML(p->value());
             } else {
-                needReboot = needReboot || d->parseHTML(String(F("")));
+                n = d->parseHTML(String(F("")));
             }
+            needReboot = needReboot || n;
         }
         
         if (needReboot) {
@@ -476,42 +661,6 @@ void setup(Sink* _sink) {
         request->send(404, String(F("text/plain")), String(F("Not found: ")) + request->url());
     });
     setupServer->begin();
-
-    ArduinoOTA.setPort(8266);
-    // set host name
-    ArduinoOTA.setHostname(deviceName.value());
-
-    ArduinoOTA.onStart([]() {
-        // debugSerial->println("Start OTA");  //  "Начало OTA-апдейта"
-        // debugSerial->println("Updating...");
-    });
-    ArduinoOTA.onEnd([]() {
-        // debugSerial->println("End OTA");  //  "Завершение OTA-апдейта"
-        // debugSerial->println("Done...");
-    });
-    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-        // debugSerial->printf("Progress: %u%%\r", (progress / (total / 100)));
-        //  debugSerial->printf("Progress %d/%d\n", progress, total);
-    });
-    ArduinoOTA.onError([](ota_error_t error) {
-        debugSerial->printf("Error[%u]: ", error);
-        if (error == OTA_AUTH_ERROR) {
-            // debugSerial->println("Auth Failed");
-            //  "Ошибка при аутентификации"
-        } else if (error == OTA_BEGIN_ERROR) {
-            // debugSerial->println("Begin Failed"); 
-            //  "Ошибка при начале OTA-апдейта"
-        } else if (error == OTA_CONNECT_ERROR) {
-            // debugSerial->println("Connect Failed");
-            //  "Ошибка при подключении"
-        } else if (error == OTA_RECEIVE_ERROR) {
-            // debugSerial->println("Receive Failed");
-            //  "Ошибка при получении данных"
-        } else if (error == OTA_END_ERROR) {
-            // debugSerial->println("End Failed");
-            //  "Ошибка при завершении OTA-апдейта"
-        }
-    });
 }
 
 int32_t lastEachSecond = millis() / 1000;
@@ -565,234 +714,60 @@ void loop() {
 
         if (WiFi.status() == WL_CONNECTED) {
             debugSerial->println(String(F("Connected to WiFi, IP:")) + WiFi.localIP().toString());
-            reconnectWebsocketAt = millis(); // Wait 1000 ms and connect to websocket
+
+            udpClient.begin(atoi(sceleton::websocketPort.value()) + 1);
+
+            reconnectWebsocketAt = millis() + 3000; // Wait 1000 ms and connect to websocket
+
+            ArduinoOTA.setPort(8266);
+
+            // set host name
+            ArduinoOTA.setHostname(deviceName.value());
+
+            ArduinoOTA.onStart([]() {
+                // debugSerial->println("Start OTA");  //  "Начало OTA-апдейта"
+                // debugSerial->println("Updating...");
+            });
+            ArduinoOTA.onEnd([]() {
+                // debugSerial->println("End OTA");  //  "Завершение OTA-апдейта"
+                // debugSerial->println("Done...");
+            });
+            ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+                // debugSerial->printf("Progress: %u%%\r", (progress / (total / 100)));
+                //  debugSerial->printf("Progress %d/%d\n", progress, total);
+            });
+            ArduinoOTA.onError([](ota_error_t error) {
+                debugSerial->printf("Error[%u]: ", error);
+                if (error == OTA_AUTH_ERROR) {
+                    // debugSerial->println("Auth Failed");
+                    //  "Ошибка при аутентификации"
+                } else if (error == OTA_BEGIN_ERROR) {
+                    // debugSerial->println("Begin Failed"); 
+                    //  "Ошибка при начале OTA-апдейта"
+                } else if (error == OTA_CONNECT_ERROR) {
+                    // debugSerial->println("Connect Failed");
+                    //  "Ошибка при подключении"
+                } else if (error == OTA_RECEIVE_ERROR) {
+                    // debugSerial->println("Receive Failed");
+                    //  "Ошибка при получении данных"
+                } else if (error == OTA_END_ERROR) {
+                    // debugSerial->println("End Failed");
+                    //  "Ошибка при завершении OTA-апдейта"
+                }
+            });
+
             ArduinoOTA.begin(false); // Begin OTA immediately
             initializedWiFi = true;
+
+            // Let's say hello and show all we can
+            sendHelloMsg();
+
+            debugSerial->println(String(F("Hello sent")));
         }
     }
 
-    if (millis() >= reconnectWebsocketAt) {
-        webSocketClient.reset(new WebSocketsClient());
-        auto wsHandler = [&](WStype_t type, uint8_t *payload, size_t length) {
-            // debugSerial->println(String("WS Event") + type);
-            switch (type) {
-                case WStype_ERROR: {
-                    debugSerial->println(String(F("WStype_ERROR")));
-                    break;
-                }
-                case WStype_CONNECTED: {
-                    if (wasConnected) { 
-                        break;
-                    }
-                    reconnectWebsocketAt = 0x7FFFFFFF;  // No need to reconnect anymore
-                    debugSerial->println(String(F("Connected to server")));
-                    lastReceived = millis();
-                    wasConnected = true;
-
-                    String devParamsStr = F("{ ");
-                    bool first = true;
-                    for (DevParam* d : devParams) {
-                        if (!d->_password && String(d->value()) != F("false")) {
-                            if (!first) { 
-                                devParamsStr += F(",");
-                            }
-                            first = false;
-                            devParamsStr += F("\""),
-                            devParamsStr += d->_name;
-                            devParamsStr += F("\": \""),
-                            devParamsStr += d->value();
-                            devParamsStr += F("\" ");
-                        }
-                    }
-                    devParamsStr += "}";
-
-                    // Let's say hello and show all we can
-                    send(String(F("{ ")) +
-                        F("\"type\":\"hello\", ") +
-                        F("\"firmware\":\"") + firmwareVersion + F("\", ") +
-                        F("\"devParams\": ") + devParamsStr + F(", ") + 
-                        F("\"screenEnabled\": ") + sink->screenEnabled() + F(", ") + 
-                        F("\"deviceName\":\"") + sceleton::deviceName.value() + F("\"") + 
-                        F(" }"));
-
-                    // send message to client
-                    // debugPrint("Hello server " + " (" + sceleton::deviceName._value +  "), firmware ver = " + firmwareVersion);
-                    debugSerial->println(String(F("Hello sent")));
-
-                    int cnt = 0;
-                    for (const char* p = sceleton::relayNames.value(); *p != 0; ++p) {
-                        if (*p == ';') {
-                            if (cnt == 0) {
-                                cnt = 1;
-                            }
-
-                            cnt++;
-                        }
-                    }
-
-                    if (cnt > 0) {
-                        for (int id = 0; id < cnt; ++id) {
-                            send(String(F("{ \"type\": \"relayState\", \"id\": ")) + String(id, DEC) + F(", \"value\":") + (sink->relayState(id) ? F("true") : F("false")) + F(" }"));
-                        }
-                        debugSerial->println("Relays state sent");
-                    }
-
-                    if (sceleton::hasLedStripe.isSet()) {
-                        send(String(F("{ \"type\": \"ledstripeState\", \"value\":\"")) + encodeRGBWString(sink) + F("\" }"));
-                        debugSerial->println(String(F("LED stripe state sent")));
-                    }
-
-                    break;
-                }
-                case WStype_TEXT: {
-                    // debugSerial->printf("[%u] get Text: %s\n", payload);
-                    DynamicJsonDocument jsonBuffer(1000);
-
-                    DeserializationError error = deserializeJson(jsonBuffer, payload);
-
-                    if (error) {
-                        // debugSerial->println("parseObject() failed");
-                        send(String(F("{ \"errorMsg\":\"Failed to parse JSON\" }")));
-                        return;
-                    }
-                    lastReceived = millis();
-
-                    const JsonObject &root = jsonBuffer.as<JsonObject>();
-
-                    String type = root[typeKey];
-                    if (type == String(F("ping"))) {
-                        // debugSerial->print(String(millis(), DEC) + ":");debugSerial->print("Ping "); debugSerial->println((const char*)(root["pingid"]));
-                        String res = F("{ \"type\": \"pingresult\", \"pid\":\"");
-                        res += (const char*)(root["pingid"]);
-                        res += F("\" }");
-                        send(res);
-                    } else if (type == String(F("switch"))) {
-                        // debugSerial->println("switch!");
-                        bool sw = root["on"] == String(F("true"));
-                        uint32_t id = atoi(root["id"]);
-                        sink->switchRelay(id, sw);
-                        reportRelayState(id);
-                    } else if (type == String(F("setProp"))) {
-                        saveSettings();
-                    #ifndef ESP01
-                    } else if (type == String(F("show"))) {
-                        sink->showMessage(root["text"], root["totalMsToShow"].as<int>());
-                    } else if (type == String(F("tune"))) {
-                        sink->showTuningMsg(root["text"]);
-                    } else if (type == String(F("unixtime"))) {
-                        sink->setTime(root["value"].as<int>());
-                    #endif
-                    } else if (type == String(F("ledstripe"))) {
-                        if (root["newyear"]) {
-                            const char* basecolor = (const char*)(root["basecolor"]);
-                            const char* blinkcolors = (const char*)(root["blinkcolors"]);
-                            int periodMs = root["period"].as<int>();
-                            sink->runLedStripeEffect(decodeRGBWString(basecolor)[0], decodeRGBWString(blinkcolors), periodMs);
-                        } else {
-                            const char* val = (const char*)(root["value"]);
-                            int periodMs = root["period"].as<int>();
-                            sink->setLedStripe(decodeRGBWString(val), periodMs);
-                        }
-                    
-                        
-                    } else if (type == String(F("playmp3"))) {
-                        uint32_t index = (uint32_t)(root["index"].as<int>());
-                        sink->playMp3(index);
-                    } else if (type == String(F("setvolume"))) {
-                        uint32_t index = (uint32_t)(root["value"].as<int>());
-                        sink->setVolume(index);
-                    } else if (type == String(F("pwm"))) {
-                        int val = root["value"].as<int>();
-                        const char* pin = root["pin"];
-                        uint32_t periodMs = root["period"].as<int>();
-                        if (pin[0] == 'D') {
-                            sink->setPWMOnPin(val, dpin[pin[1] - '0'], periodMs);
-                        }
-                    #ifndef ESP01
-                    } else if (type == String(F("atxEnable"))) {
-                        int val = root[String(F("value"))].as<boolean>();
-                        sink->switchATX(val);
-                    } else if (type == String(F("screenEnable"))) {
-                        int val = root[String(F("value"))].as<boolean>();
-                        sink->enableScreen(val);
-                        saveBrightnessAt = millis() + 1000; // In 1 second, save brightness
-                    } else if (type == String(F("brightness"))) {
-                        int val = root[String(F("value"))].as<int>();
-                        val = std::max(std::min(val, 100), 0);
-                        sink->setBrightness(val);
-                        brightness.setValue(String(val, DEC));
-                        saveBrightnessAt = millis() + 1000; // In 1 second, save brightness
-                    #endif
-                    } else if (type == String(F("additional-info"))) {
-                        // 
-                        sink->setAdditionalInfo(root[String(F("text"))]);
-                    } else if (type == String(F("reboot"))) {
-                        debugPrint(String(F("Let's reboot self")));
-                        sink->reboot();
-                    }
-                    break;
-                }
-                case WStype_BIN: {
-                    // debugSerial->printf("[%u] get binary length: %u\n", length);
-                    // hexdump(payload, length);
-                    debugPrint(String(F("Received binary packet of size ")) + String(length, DEC));
-
-                    // send message to client
-                    // webSocketClient.sendBIN(payload, length);
-                    break;
-                }
-                case WStype_DISCONNECTED: {
-                    // debugSerial->print(String(millis(), DEC) + ":"); debugSerial->printf("Disconnected [%u]!\n", WiFi.status());
-                    if (WiFi.status() == WL_CONNECTED && wasConnected) {
-                        wasConnected = false;
-                        debugSerial->println(String(F("Disconnected from server ")) + String(length, DEC));
-                        reconnectWebsocketAt = millis() + 4000; // In 4 second, let's try to reconnect
-                    }
-                    break;
-                }
-                case WStype_PING:
-                case WStype_PONG:
-                    break;
-
-                default:
-                    debugSerial->println(String(F("Unknown type: ")) + String(type, DEC));
-            }
-        };
-
-        webSocketClient->onEvent(wsHandler);
-
-        debugSerial->println(String(F("webSocketClient connecting to ")) + websocketServer.value());
-        uint32_t ms = millis();
-        webSocketClient->disableHeartbeat();
-        webSocketClient->begin(websocketServer.value(), atoi(websocketPort.value()), "/esp");
-        debugSerial->println(String(F("webSocketClient.begin() took ")) + String(millis() - ms, DEC));
-        reconnectWebsocketAt = millis() + 8000; // 8 seconds should be enough to cennect WS
-    }
 
     if (initializedWiFi) {
-        if (webSocketClient.get() != NULL) {
-            uint32_t ms = millis();
-            // debugSerial->println("before loop");
-            webSocketClient->loop();
-            // debugSerial->println("after loop");
-            if ((millis() - ms) > 50) {
-                debugSerial->println(String(F("webSocketClient.loop() took ")) + String(millis() - ms, DEC));
-            }
-        }
-    }
-
-    if (initializedWiFi) {
-        if (millis() - lastReceived > msBeforeRestart) {
-            //debugSerial->println("Rebooting...");
-            if (reportedGoingToReconnect <= lastReceived) {
-                sink->showMessage((String(msBeforeRestart / 1000, DEC) + F(" секунд без связи с сервером, перезагружаемся")).c_str(), 3000);
-                debugSerial->println(String(msBeforeRestart / 1000, DEC) + F(" seconds w/o connect to server"));
-                reportedGoingToReconnect = millis();
-            }
-
-            rebootAt = millis();
-        }
-
         if (rebootAt <= millis()) {
             sink->reboot();
         }
@@ -800,6 +775,91 @@ void loop() {
 
     if (saveBrightnessAt < millis()) {
         saveBrightnessAt = 0x7FFFFFFF;
+    }
+
+    if (initializedWiFi && (millis() - lastPing) > 2000) {
+        lastPing = millis();
+
+        udpSend([=](Msg& msg) {}); // Simple UDP packet send, no data!
+        // debugPrint("Sent ping");
+    }
+
+    auto bytesInUdbBuf = udpClient.parsePacket();
+    if (bytesInUdbBuf > 0) {
+        // debugSerial->println("RECEIVED UDP " + String(bytesInUdbBuf, DEC));
+        buffer.resize(bytesInUdbBuf + 1, 0);
+        auto wasRead = udpClient.readBytes(&buffer[0], bytesInUdbBuf);
+
+        // debugSerial->println("Decoding " + String(wasRead, DEC));
+        pb_istream_t stream = pb_istream_from_buffer(&buffer[0], wasRead);
+        messageBack = messageBack_empty;
+
+        String textToShow;
+        messageBack.textToShow = strDecode(textToShow);
+        String ledBaseColor;
+        messageBack.ledBaseColor = strDecode(ledBaseColor);
+        String ledBlinkColors;
+        messageBack.ledBlinkColors = strDecode(ledBlinkColors);
+        String ledValue;
+        messageBack.ledValue = strDecode(ledValue);
+
+        bool status = pb_decode(&stream, MsgBack_fields, &messageBack);
+        if (!status) {
+            debugSerial->println(F("Decoding failed"));
+        } else {
+            if (messageBack.has_introduceYourself && messageBack.introduceYourself) {
+                sendHelloMsg();
+            }
+            if (messageBack.has_unixtime) {
+                sink->setTime(messageBack.unixtime);
+            }
+            if (textToShow.length() > 0) {
+                if (messageBack.showType == MsgBack_ShowType_SHOW) {
+                    sink->showMessage(textToShow.c_str(), messageBack.timeMsToShow);
+                } else if (messageBack.showType == MsgBack_ShowType_TUNE) {
+                    sink->showTuningMsg(textToShow.c_str());
+                } else if (messageBack.showType == MsgBack_ShowType_ADDITIONAL) {
+                    sink->setAdditionalInfo(textToShow.c_str());
+                }
+            }
+            if (messageBack.has_reboot && messageBack.reboot) {
+                sink->reboot();
+            }
+            if (messageBack.has_relaysToSwitch && messageBack.has_relaysToSwitchState) {
+                sink->switchRelay(messageBack.relaysToSwitch, messageBack.relaysToSwitchState);
+                reportRelayState(messageBack.relaysToSwitch);
+            }
+            if (messageBack.has_atxEnable) {
+                sink->switchATX(messageBack.atxEnable);
+            }
+            if (messageBack.has_playMp3) {
+                sink->playMp3(messageBack.playMp3);
+            }
+            if (messageBack.has_volume) {
+                sink->setVolume(messageBack.volume);
+            }
+            if (messageBack.has_screenEnable) {
+                sink->enableScreen(messageBack.screenEnable);
+            }
+            if (messageBack.has_brightness) {
+                uint32_t val = std::max(std::min(messageBack.brightness, 100u), 0u);
+                sink->setBrightness(val);
+                brightness.setValue(String(val, DEC));
+            }
+            if (messageBack.has_pwmPeriod && messageBack.has_pwmPin && messageBack.has_pwmValue) {
+                uint8_t pinIndex = dpin[messageBack.pwmPin];
+
+                sink->setPWMOnPin(messageBack.pwmValue, pinIndex, messageBack.pwmPeriod);
+            }
+            if (messageBack.has_ledPeriod) {
+                if (ledValue.length() > 0) {
+                    sink->setLedStripe(decodeRGBWString(ledValue.c_str()), messageBack.ledPeriod);
+                } else {
+                    // new year
+                    sink->runLedStripeEffect(decodeRGBWString(ledBaseColor.c_str())[0], decodeRGBWString(ledBlinkColors.c_str()), messageBack.ledPeriod);
+                }
+            }
+        }
     }
 
     ArduinoOTA.handle();
@@ -813,11 +873,8 @@ void loop() {
 
 } // namespace
 
-void debugPrint(const String& str) {
-    if (sceleton::webSocketClient.get() != NULL) {
-        String toSend;
-        toSend = String(F("{ \"type\": \"log\", \"val\": \"")) + str + F("\" }");
-
-        sceleton::send(toSend);
-    }
+void debugPrint(const String& stringg) {
+    sceleton::udpSend([=](Msg& msg) {
+        msg.debugLogMessage = sceleton::str(stringg);
+    });
 }

@@ -7,19 +7,13 @@
 
 #include "worklogic.h"
 
-#ifndef ESP01
 #include <OneWire.h>
 #include <Q2HX711.h>
 #include "lcd.h"
-#endif
 
 #include "ledStripe.h"
 #include <SoftwareSerial.h>
 
-
-#include <pb_encode.h>
-#include <pb_decode.h>
-#include "protocol.pb.h"
 
 unsigned int localPort = 2390;  // local port to listen for UDP packets
 
@@ -27,23 +21,17 @@ const uint64_t dayInMs = 24 * 60 * 60 * 1000;
 
 boolean isScreenEnabled = true;
 
-#ifndef ESP01
 LcdScreen screen;
 MAX72xx* screenController = NULL;
-#endif
 
 Adafruit_BME280* bme = NULL;  // I2C
 
-WiFiUDP udpClient;
 // #define BEEPER_PIN D2 // Beeper
 
 int testCntr = 0;
 
-#ifndef ESP01
 Q2HX711* hx711 = NULL;
-#endif
 
-#ifndef ESP01
 struct Key {
     const char* bin;
     const char* value;
@@ -72,7 +60,6 @@ static void ICACHE_RAM_ATTR irIRQHandler() {
     lastIRChange = m;
     lastIRChangeMs = millis();
 }
-#endif
 
 uint8_t bluePillPacketStart[] PROGMEM = {0x80, 0x1d, 0x7d, 0x2e, 0x00, 0x03, 0xb9, 0x13 };
 uint8_t bluePillPacketEnd[] PROGMEM = {0xff, 0x5b, 0xa1, 0x35, 0x33, 0x6f, 0xf5, 0x37 };
@@ -83,14 +70,12 @@ boolean invertRelayState = false;
 boolean relayIsInitialized = false;
 SoftwareSerial* relay = NULL;
 
-#ifndef ESP01
 OneWire* oneWire;
 
 uint32_t lastMsp430Ping = millis();
 SoftwareSerial* msp430 = NULL;  // RX, TX
 
 SoftwareSerial* dfplayerSerial = NULL;  // RX, TX
-#endif
 
 const int NUMPIXELS = 64;
 Adafruit_NeoPixel* stripe = NULL;
@@ -99,10 +84,8 @@ const long interval = 1000;  // Request each second
 unsigned long nextRequest = millis();
 unsigned long nextRead = ULONG_MAX;
 
-#ifndef ESP01
 typedef uint8_t DeviceAddress[8];
 DeviceAddress deviceAddress = {0};
-#endif
 
 struct PWMState {
     uint8_t pin;
@@ -126,7 +109,6 @@ int interruptCounter = 0;
 uint32_t timeRetreivedInMs = 0;
 uint32_t initialUnixTime = 0;
 uint32_t restartAt = ULONG_MAX;
-#ifndef ESP01
 uint32_t nextPotentiometer = 0;
 
 uint16_t analogInValues[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -137,14 +119,12 @@ int32_t reportedAnalogValue = -1;
 int oldPowerState = -1;
 
 uint32_t ssdPins[] PROGMEM = {D1, D2, D5, D6};
-#endif
 
 LedStripe* ledStripe = NULL;
 uint32_t lastLedStripeUpdate = 0;
 
 void ICACHE_RAM_ATTR handleInterrupt() { interruptCounter++; }
 
-#ifndef ESP01
 boolean encoderPinChanged = false;
 
 #define DFPLAYER_RECEIVED_LENGTH 10
@@ -218,31 +198,55 @@ class Encoder {
             s += encName;
             if (pA != _pA || pB != _pB) {
                 if (_pA == 0 && _pB == 1 && pA == 1 && pB == 1) {
+                    String key = F("rotate_cw");
+                    sceleton::udpSend([&](Msg& m) {
+                        m.has_parsedRemote = true;
+                        m.parsedRemote.remote = sceleton::str(s);
+                        m.parsedRemote.key = sceleton::str(key);
+                    });
+                    /*
                     String toSend =
                         String(F("{ \"type\": \"ir_key\", ")) + F("\"remote\": \"") +
                         s + F("\", ") + F("\"key\": \"") + F("rotate_cw") + F("\", ") +
                         F("\"timeseq\": ") + String(millis(), DEC) + F(" ") + F("}");
 
                     sceleton::send(toSend);
+                    */
                 } else if (_pA == 1 && _pB == 0 && pA == 1 && pB == 1) {
+                    String key = F("rotate_ccw");
+                    sceleton::udpSend([&](Msg& m) {
+                        m.has_parsedRemote = true;
+                        m.parsedRemote.remote = sceleton::str(s);
+                        m.parsedRemote.key = sceleton::str(key);
+                    });
+                    /*
                     String toSend =
                         String(F("{ \"type\": \"ir_key\", ")) + F("\"remote\": \"") +
                         s + F("\", ") + F("\"key\": \"") + F("rotate_ccw") + F("\", ") +
                         F("\"timeseq\": ") + String(millis(), DEC) + F(" ") + F("}");
 
                     sceleton::send(toSend);
+                    */
                 }
                 _pA = pA;
                 _pB = pB;
             }
             if (pBtn != _pBtn) {
                 if (_pBtn == 0 && pBtn == 1) {
+                    /*
                     String toSend =
                         String(F("{ \"type\": \"ir_key\", ")) + F("\"remote\": \"") +
                         s + F("\", ") + F("\"key\": \"") + F("click") + F("\", ") +
                         F("\"timeseq\": ") + String(millis(), DEC) + F(" ") + F("}");
 
                     sceleton::send(toSend);
+                    */
+                    String key = F("click");
+                    sceleton::udpSend([&](Msg& m) {
+                        m.has_parsedRemote = true;
+                        m.parsedRemote.remote = sceleton::str(s);
+                        m.parsedRemote.key = sceleton::str(key);
+                    });
                 }
                 _pBtn = pBtn;
             }
@@ -276,7 +280,6 @@ Encoder encoders[] = {
     Encoder("left", D1, D2, D3),
     Encoder("right", D5, D6, D7),
 };
-#endif  // ESP01
 
 void setup() {
     class SinkImpl : public sceleton::Sink {
@@ -292,27 +295,26 @@ void setup() {
         }
 
         virtual void switchRelay(uint32_t id, bool val) {
-            // debugSerial->println(String("switchRelaySink: ") + (val ? "true"
-            // : "false"));
+            // debugSerial->println(String("switchRelaySink: ") + String(id, DEC) + " " + (val ? "true" : "false"));
+
             int bit = 1 << id;
             currRelayState = currRelayState & ~bit;
             if (val) {
                 currRelayState = currRelayState | bit;
             }
-#ifndef ESP01
+
             if (sceleton::hasSolidStateRelay.isSet()) {
                 if (id >= 0 && id < 4) {
                     bool invert = sceleton::invertRelayControl.isSet();
                     digitalWrite(ssdPins[id], val ? (invert ? 0 : 1) : (invert ? 1 : 0));
                 }
             } else {
-#endif
                 if (!relayIsInitialized) {
 #ifdef ESP01
                     relay = new SoftwareSerial(0, 2);  // RX, TX
 #else
-                relay = new SoftwareSerial(D1, D0);  // RX, TX
-                relay->enableRx(false);              // We don't want to receive from it
+                    relay = new SoftwareSerial(D1, D0);  // RX, TX
+                    relay->enableRx(false);              // We don't want to receive from it
 #endif
                     relay->begin(9600);
                     delay(100);
@@ -327,40 +329,35 @@ void setup() {
                              (sceleton::invertRelayControl.isSet()
                                   ? ~currRelayState
                                   : currRelayState));
-#ifndef ESP01
             }
-#endif
+
             if (sceleton::hasGPIO1Relay.isSet()) {
                 digitalWrite(D4, val);
             }
         }
 
         virtual void showMessage(const char* dd, int totalMsToShow) {
-#ifndef ESP01
-            //
-            screen.showMessage(dd, totalMsToShow);
-#endif
+            if (dd != nullptr) {
+                debugSerial->println(dd);
+
+                //
+                screen.showMessage(dd, totalMsToShow);
+            }
         }
 
         virtual void showTuningMsg(const char* dd) {
-#ifndef ESP01
             screen.showTuningMsg(dd);
-#endif
         }
 
         virtual void setAdditionalInfo(const char* dd) {
-#ifndef ESP01
             //
             screen.setAdditionalInfo(dd);
-#endif
         }
 
         virtual void setBrightness(int percents) {
-#ifndef ESP01
             if (screenController != NULL) {
                 screenController->setBrightness(percents);
             }
-#endif
         }
 
         virtual void setTime(uint32_t unixTime) {
@@ -392,8 +389,7 @@ void setup() {
             if (restartAt - millis() >= 200) {
                 if (restartReportedAt < millis()) {
                     restartReportedAt = millis() + 300;
-#ifndef ESP01
-                    // debugSerial->println("Rebooting");
+
                     if (screenController != NULL) {
                         debugPrint("Rebooting");
                         screen.clear();
@@ -401,8 +397,7 @@ void setup() {
 
                         screenController->refreshAll();
                     }
-                    sceleton::webSocketClient->disconnect();
-#endif
+                    // sceleton::webSocketClient->disconnect();
                 }
                 restartAt = millis() + 200;
             }
@@ -432,15 +427,11 @@ void setup() {
         }
 
         virtual void setVolume(uint32_t vol) {
-#ifndef ESP01
             dfPlayerSend(0x06, (uint16_t)vol);  //
-#endif
         }
 
         virtual void playMp3(uint32_t index) {
-#ifndef ESP01
             dfPlayerSend(0x03, (uint16_t)index);  //
-#endif
         }
     };
 
@@ -459,29 +450,23 @@ void setup() {
         stripe->show();
     }
 
-#ifndef ESP01
     if (sceleton::hasIrReceiver.isSet()) {
        attachInterrupt(digitalPinToInterrupt(D2), irIRQHandler, CHANGE);
     }
-#endif
 
-#ifndef ESP01
     if (sceleton::hasDS18B20.isSet()) {
         oneWire = new OneWire(D1);
 
         oneWire->reset_search();
         oneWire->search(deviceAddress);
     }
-#endif
 
-#ifndef ESP01
     if (sceleton::hasDFPlayer.isSet()) {
         debugSerial->println("Init DFPlayer Mini");
         dfplayerSerial = new SoftwareSerial(D1, D0);  // RX, TX
         dfplayerSerial->begin(9600);
         pinMode(D3, INPUT);  // BUSY
     }
-#endif
 
     if (sceleton::hasBME280.isSet()) {
         Wire.begin(D4, D3);
@@ -499,15 +484,12 @@ void setup() {
         digitalWrite(D4, 1);
     }
 
-#ifndef ESP01
     if (sceleton::hasHX711.isSet()) {
         hx711 = new Q2HX711(D5, D6);
     }
-#endif
 
     // Initialize comms hardware
     // pinMode(BEEPER_PIN, OUTPUT);
-#ifndef ESP01
     if (sceleton::hasScreen.isSet()) {
         screenController = new MAX72xx(
             screen, D5, D7, D6, sceleton::hasScreen180Rotated.isSet());
@@ -553,7 +535,7 @@ void setup() {
         digitalWrite(D8, 1); // 1 means DOWN
         pinMode(D2, INPUT);
     }
-#endif
+
     if (sceleton::hasPWMOnD0.isSet()) {
         analogWriteFreq(21000);
         analogWriteRange(1024);
@@ -573,13 +555,10 @@ void setup() {
 
     if (sceleton::hasGPIO1Relay.isSet()) {
     }
-    
-    udpClient.begin(atoi(sceleton::websocketPort.value()) + 1);
 
     if (sceleton::hasBluePill.isSet()) {
         debugSerial = new sceleton::DummySerial();
 
-        udpClient.begin(atoi(sceleton::websocketPort.value()) + 1);
         Serial.begin(460800);
     }
 }
@@ -598,22 +577,17 @@ WiFiClient client;
 
 uint32_t lastTemp = millis();
 
-#ifndef ESP01
 uint32_t lastWeighteningStarted = millis();
 long lastWeight = 0;
 uint32_t wrongTempValueReceivedCnt = 0;
 
 uint32_t lastReadDFBusy = millis() - 200;
 uint32_t dfBusyNow = -1;
-#endif
 
 long lastStripeFrame = millis();
 
 long lastLoop = millis();
 long lastLoopEnd = millis();
-
-std::vector<uint8_t> buffer;
-Msg message = Msg_init_zero;
 
 void loop() {
     if (millis() - lastLoop > 50) {
@@ -632,66 +606,59 @@ void loop() {
     }
 
     if (interruptCounter > 0) {
-        debugSerial->println("1");
-        String toSend =
-            String("{ \"type\": \"button\", ") +
-            "\"value\": " + (digitalRead(D7) == LOW ? "true" : "false") + ", " +
-            "\"timeseq\": " + String((uint32_t)millis(), DEC) + " " + "}";
-
-        sceleton::send(toSend);
+        sceleton::udpSend([&](Msg& m) {
+            m.has_buttonPressed = true;
+            m.buttonPressed = digitalRead(D7) == LOW;
+        });
         interruptCounter = 0;
     }
 
-#ifndef ESP01
     if (sceleton::hasHX711.isSet() &&
         (millis() - lastWeighteningStarted) > 100 && hx711->readyToSend()) {
-        debugSerial->println("3");
         lastWeighteningStarted = millis();
 
         // debugSerial->println();
         long val = hx711->read();
 
+        sceleton::udpSend([&](Msg& m) {
+            m.has_weight = true;
+            m.weight = val;
+        });
+/*
         String toSend = String("{ \"type\": \"weight\", ") +
                         "\"value\": " + String(val, DEC) + ", " +
                         "\"timeseq\": " + String((uint32_t)millis(), DEC) +
                         " " + "}";
 
         sceleton::send(toSend);
-
+*/
         lastWeight = val;
     }
-#endif
 
-    if (bme != NULL && ((millis() - lastTemp) > 4000)) {
+    if (bme != nullptr && ((millis() - lastTemp) > 1000)) {
         lastTemp = millis();
         float hum = bme->readHumidity();
         float temp = bme->readTemperature();
         float pressure = bme->readPressure();
+        // 
 
-        struct {
-            const char* name;
-            float value;
-        } toSendArr[] = {
-            {"temp", temp},
-            {"humidity", hum},
-            {"pressure", pressure},
-        };
-        for (size_t i = 0; i < __countof(toSendArr); ++i) {
-            if (!isnan(toSendArr[i].value)) {
-                String toSend =
-                    String("{ \"type\": \"") + String(toSendArr[i].name) +
-                    String("\", ") +
-                    "\"value\": " + String(toSendArr[i].value) + ", " +
-                    "\"timeseq\": " + String((uint32_t)millis(), DEC) + " " +
-                    "}";
-                sceleton::send(toSend);
+        sceleton::udpSend([=](Msg& m) {
+            if (!isnan(hum)) {
+                m.has_humidity = true; 
+                m.humidity = hum;
             }
-        }
+            if (!isnan(temp)) {
+                m.has_temp = true; 
+                m.temp = temp;
+            }
+            if (!isnan(pressure)) {
+                m.has_pressure = true; 
+                m.pressure = pressure;
+            }
+        });
     }
 
-#ifndef ESP01
     if (oneWire != NULL) {
-        debugSerial->println("5");
         if (millis() > nextRequest) {
             oneWire->reset();
             oneWire->write(0xCC);  //Обращение ко всем датчикам
@@ -725,23 +692,19 @@ void loop() {
                 // debugPrint("Temp: " + String(byte1, HEX) + " " +
                 // String(byte2, HEX) + " -> " + String(val));
 
-                String toSend =
-                    String("{ \"type\": \"temp\", ") +
-                    "\"value\": " + String(val) + ", " +
-                    "\"timeseq\": " + String((uint32_t)millis(), DEC) + " " +
-                    "}";
-                sceleton::send(toSend);
+                sceleton::udpSend([&](Msg& m) {
+                    m.has_temp = true;
+                    m.temp = val;
+                });
             }
 
             nextRead = ULONG_MAX;
         }
     }
-#endif
 
     oldMicros = micros();
     testCntr++;
 
-#ifndef ESP01
     if (screenController != NULL) {
         if (millis() > (lastScreenRefresh + 20)) {
             lastScreenRefresh = millis();
@@ -772,14 +735,16 @@ void loop() {
             }
         }
     }
-#endif
 
-#ifndef ESP01
     if (sceleton::hasIrReceiver.isSet()) {
         auto irPause = (int64_t)millis() - lastIRChangeMs;
 
         if (irPause > 60) {
             if (ir.size() > 5) {
+                sceleton::udpSend([&](Msg& msg) {
+                    msg.irKeyPeriods = sceleton::repeated_int(ir);
+                });
+                /*
                 String decoded = "";
                 // We intentionally skip the very first period, because it is a pause between keys
                 for (size_t i = 1; i < ir.size(); ++i) {
@@ -797,35 +762,6 @@ void loop() {
                 if (sceleton::webSocketClient.get() != NULL) {
                     sceleton::send(toSend);
                 }
-
-                /*
-                String decoded = "";
-                
-                message.id = 22;
-                message.timeseq = millis();
-
-                // We intentionally skip the very first period, because it is a pause between keys
-                for (size_t i = 1; i < ir.size(); ++i) {
-                    message.irKeyPeriods[i - 1] = ir[i];
-                }
-                message.irKeyPeriods_count = ir.size() - 1;
-
-                buffer.resize(4000, 0);
-                pb_ostream_t stream = pb_ostream_from_buffer(&buffer[0], buffer.size());
-                pb_encode(&stream, Msg_fields, &message);
-
-                debugSerial->println("!!!!!!!!!!!");
-                debugSerial->println(String(stream.bytes_written, DEC));
-
-                udpClient.beginPacket(
-                    sceleton::websocketServer.value(), 
-                    atoi(sceleton::websocketPort.value()) + 1);
-                int b = stream.bytes_written;
-                for (const uint8_t* p = &buffer[0];
-                    b > 0; ++p, --b) {
-                    udpClient.write(*p);
-                } 
-                udpClient.endPacket();
                 */
             }
 
@@ -833,8 +769,7 @@ void loop() {
         }
     }
 
-    if (sceleton::hasMsp430.isSet() && msp430 != NULL &&
-        sceleton::webSocketClient.get() != NULL) {
+    if (sceleton::hasMsp430.isSet() && msp430 != NULL) {
         for (; msp430->available() > 0;) {
             int ch = msp430->read();
             lastMsp430Ping = millis();
@@ -860,14 +795,13 @@ void loop() {
                     if (ss != NULL) {
                         String s = "encoder_";
                         s += encoderNames[enc];
-                        String toSend =
-                            String("{ \"type\": \"ir_key\", ") +
-                            "\"remote\": \"" + s + "\", " + "\"key\": \"" + ss +
-                            "\", " + "\"timeseq\": " + String(millis(), DEC) +
-                            " " + "}";
-                        // debugSerial->printf("> %s %s\n", s.c_str(), ss);
 
-                        sceleton::send(toSend);
+                        String key = F("rotate_ccw");
+                        sceleton::udpSend([&](Msg& m) {
+                            m.has_parsedRemote = true;
+                            m.parsedRemote.remote = sceleton::str(s);
+                            m.parsedRemote.key = sceleton::str(ss);
+                        });
                     }
                 }
             }
@@ -876,9 +810,9 @@ void loop() {
             // debugPrint("MSP430 didn't ping us for 3seconds, let's restart
             // it");
             digitalWrite(D2, 0);
-            debugSerial->println(
-                "MSP430 didn't ping us for 3seconds, let's restart it");
-            debugPrint("MSP430 didn't ping us for 3seconds, let's restart it");
+            String msg(F("MSP430 didn't ping us for 3seconds, let's restart it"));
+            debugSerial->println(msg);
+            debugPrint(msg);
             delay(50);
             digitalWrite(D2, 1);
             lastMsp430Ping = millis();
@@ -909,13 +843,11 @@ void loop() {
             }
         }
     }
-#endif
 
     sceleton::loop();
 
     // debugSerial->println(String(millis(), DEC));
 
-#ifndef ESP01
     // Process encoders
     for (size_t i = 0; i < __countof(encoders); ++i) {
         encoders[i].process();
@@ -940,19 +872,14 @@ void loop() {
         readingIn = (int32_t)(total / __countof(analogInValues));
 
         if (reportedAnalogValue != readingIn) {
-            if (sceleton::webSocketClient.get() != NULL) {
-                String toSend = String("{ \"type\": \"potentiometer\", ") +
-                                "\"value\": \"" + readingIn + "\", " +
-                                "\"timeseq\": " + String(millis(), DEC) + " " +
-                                "}";
-                sceleton::send(toSend);
-                reportedAnalogValue = readingIn;
-            }
+            sceleton::udpSend([&](Msg& m) {
+                m.has_potentiometer = true;
+                m.potentiometer = readingIn;
+            });
+            reportedAnalogValue = readingIn;
         }
     }
-#endif
 
-#ifndef ESP01
     if (sceleton::hasDFPlayer.isSet()) {
         if (millis() - lastReadDFBusy > 200) {
             lastReadDFBusy = millis();
@@ -972,7 +899,6 @@ void loop() {
         //  debugSerial->println(b);
         //}
     }
-#endif
 
     // Led stripe
     if (ledStripe != NULL && (millis() - lastLedStripeUpdate) > 50 ) {
@@ -1038,14 +964,14 @@ void loop() {
                 &bluePillPacketEnd[0], &bluePillPacketEnd[0] + __countof(bluePillPacketEnd));
             
             if ((startSeq != bufferEnd) && (endSeq != bufferEnd)) {               
-                udpClient.beginPacket(
+                sceleton::udpClient.beginPacket(
                     sceleton::websocketServer.value(), 
                     atoi(sceleton::websocketPort.value()) + 1);
                 for (const uint8_t* p = startSeq + __countof(bluePillPacketStart);
                     p != endSeq; ++p) {
-                    udpClient.write(*p);
+                    sceleton::udpClient.write(*p);
                 }
-                udpClient.endPacket();
+                sceleton::udpClient.endPacket();
                 
                 uint8_t* out = bufferStart;
                 for (const uint8_t* p = endSeq + __countof(bluePillPacketEnd);
@@ -1058,22 +984,19 @@ void loop() {
         }
     }
 
-#ifndef ESP01
     if (millis() % 500 == 12) {
         if (sceleton::hasATXPowerSupply.isSet()) {
             int currAtxState = digitalRead(D2);
             if (oldPowerState != currAtxState) {
                 oldPowerState = currAtxState;
-                if (sceleton::webSocketClient.get() != NULL) {
-                    String toSend =
-                        String("{ \"type\": \"atxState\", ") + "\"value\": " +  String(currAtxState, DEC) + ", " +
-                        "\"timeseq\": " + String(millis(), DEC) + " " + "}";
-                    sceleton::send(toSend);
-                }
+                
+                sceleton::udpSend([&](Msg& m) {
+                    m.has_atxState = true;
+                    m.atxState = currAtxState != 0;
+                });
             }
         }
     }
-#endif
 
     lastLoopEnd = millis();
 }

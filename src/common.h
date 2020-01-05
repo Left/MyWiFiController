@@ -1,10 +1,12 @@
 #pragma once
+
+#include <functional>
+
 /**
  * Some useful common things
  */
 
 #define __countof(x) (sizeof(x)/sizeof(x[0]))
-
 
 // Stringify defines
 #define __TO_STR2(x) #x

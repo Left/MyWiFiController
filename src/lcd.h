@@ -1,6 +1,5 @@
 #pragma once
 
-#include <functional>
 #include <algorithm>
 
 #include "common.h"
@@ -67,7 +66,7 @@ const uint8_t* symbolPtrOrNull(wchar_t symbol) {
     if (unicodeSym >= 0 && unicodeSym < (sizeof(fontUA) - 1)/fontItem) {
         return fontUA + 1 + unicodeSym*fontItem;
     }
-    return NULL;
+    return nullptr;
 }
 
 
@@ -164,11 +163,11 @@ public:
         return _msg;
     }
 
-    bool isSet() {
-        return _msg != NULL;
+    bool isSet() const {
+        return _msg != nullptr;
     }
 
-    bool empty() {
+    bool empty() const {
         return !isSet() || (_msg[0] == 0);
     }
 
@@ -181,61 +180,65 @@ public:
 
     void set(const WSTR* ss, uint32_t count) {
         clear();
-        uint32_t totalCnt = 0;
-        for (uint32_t i = 0; i < count; ++i) {
-            totalCnt += wcslen(ss[i]);
-        }
-        _msg = (WSTR_MUTABLE)malloc(2*totalCnt + 2);
-        WSTR_MUTABLE s = _msg;
-        for (uint32_t i = 0; i < count; ++i) {
-            for (int t = 0; ss[i][t] != 0; ++t) {
-                *s = ss[i][t];
-                s++;
-                *s = 0;
+        if (ss != nullptr) { 
+            uint32_t totalCnt = 0;
+            for (uint32_t i = 0; i < count; ++i) {
+                totalCnt += wcslen(ss[i]);
             }
+            _msg = (WSTR_MUTABLE)malloc(2*totalCnt + 2);
+            WSTR_MUTABLE s = _msg;
+            for (uint32_t i = 0; i < count; ++i) {
+                for (int t = 0; ss[i][t] != 0; ++t) {
+                    *s = ss[i][t];
+                    s++;
+                    *s = 0;
+                }
+            }
+            strStartAt = millis();
         }
-        strStartAt = millis();
     }
 
     void set(const char* utf8str, const int totalMsToShow) {
         clear();
-        _totalMsToShow = totalMsToShow;
-        int maxSize = strlen(utf8str)*2;
-        _msg = (WSTR_MUTABLE)malloc(maxSize + 2);
-        memset(_msg, 0, maxSize + 2);
-        int srcLen = strlen(utf8str);
-        for (int i = 0, outIndex = 0; utf8str[i] != 0;) {
-            uint16_t sym = utf8str[i];
+        if (utf8str != nullptr) {
+            _totalMsToShow = totalMsToShow;
+            int maxSize = strlen(utf8str)*2;
+            _msg = (WSTR_MUTABLE)malloc(maxSize + 2);
+            memset(_msg, 0, maxSize + 2);
+            int srcLen = strlen(utf8str);
+            for (int i = 0, outIndex = 0; utf8str[i] != 0;) {
+                uint16_t sym = utf8str[i];
 
-            if (
-                (sym & 0b11110000) == 0b11100000 && 
-                ((i + 1) < srcLen) && (utf8str[i+1] & 0b11000000) == 0b10000000 &&
-                ((i + 2) < srcLen) && (utf8str[i+2] & 0b11000000) == 0b10000000
-            ) {
-                    // If an UCS fits 16 bits, it is coded as 1110xxxx 10xxxxxx 10xxxxxx
-                _msg[outIndex++] = 
-                    (((sym & 0b1111) << 12) & 0b1111000000000000) |
-                    ((((uint16_t)utf8str[i+1] & 0b111111) << 6) & 0b111111000000) |
-                    ((uint16_t)utf8str[i+2] & 0b111111);
+                if (
+                    (sym & 0b11110000) == 0b11100000 && 
+                    ((i + 1) < srcLen) && (utf8str[i+1] & 0b11000000) == 0b10000000 &&
+                    ((i + 2) < srcLen) && (utf8str[i+2] & 0b11000000) == 0b10000000
+                ) {
+                        // If an UCS fits 16 bits, it is coded as 1110xxxx 10xxxxxx 10xxxxxx
+                    _msg[outIndex++] = 
+                        (((sym & 0b1111) << 12) & 0b1111000000000000) |
+                        ((((uint16_t)utf8str[i+1] & 0b111111) << 6) & 0b111111000000) |
+                        ((uint16_t)utf8str[i+2] & 0b111111);
 
-                i+=3;
-            } else if (
-                (sym & 0b11100000) == 0b11000000 && 
-                ((i + 1) < srcLen) && (utf8str[i+1] & 0b11000000) == 0b10000000) {
-                // If an UCS fits 11 bits, it is coded as 110xxxxx 10xxxxxx
-                _msg[outIndex++] = (((sym & 0b11111) << 6) & 0b11111000000) |
-                    ((uint16_t)utf8str[i+1] & 0b111111);
-                i+=2;
-            } else if ((sym & 0b10000000) == 0) {
-                // If an UCS fits 7 bits, its coded as 0xxxxxxx. This makes ASCII character represented by themselves
-                _msg[outIndex++] = sym;
-                i++;
-            } else {
-                i++;
+                    i+=3;
+                } else if (
+                    (sym & 0b11100000) == 0b11000000 && 
+                    ((i + 1) < srcLen) && (utf8str[i+1] & 0b11000000) == 0b10000000) {
+                    // If an UCS fits 11 bits, it is coded as 110xxxxx 10xxxxxx
+                    _msg[outIndex++] = (((sym & 0b11111) << 6) & 0b11111000000) |
+                        ((uint16_t)utf8str[i+1] & 0b111111);
+                    i+=2;
+                } else if ((sym & 0b10000000) == 0) {
+                    // If an UCS fits 7 bits, its coded as 0xxxxxxx. This makes ASCII character represented by themselves
+                    _msg[outIndex++] = sym;
+                    i++;
+                } else {
+                    i++;
+                }
             }
-        }
 
-        strStartAt = millis();
+            strStartAt = millis();
+        }
     }
 };
 
@@ -367,6 +370,9 @@ public:
      * Prints several strings at once
      */
     int printStr(int _x, int _y, const WSTR* strs, int strsCnt) {
+        if (strs == nullptr) {
+            return 0;
+        }
         int ww = 0;
         for (;strsCnt > 0; --strsCnt, ++strs) {
             int w = printStr(_x, _y, *(strs));
@@ -380,6 +386,9 @@ public:
      * Prints string and returns printed string width
      */
     int printStr(int _x, int _y, WSTR str) {
+        if (str == nullptr) {
+            return 0;
+        }
         int w = 0;
         for (int i=0; str[i] != 0; ++i) {
             const uint8_t* symbol = symbolPtrOrNull(str[i]);
@@ -415,7 +424,7 @@ public:
      */
     void showTime(uint32_t daysSince1970, uint32_t millisSince1200) {
         int millisNow = millis();
-        if (_tuningMsgNow.isSet()) {
+        if (_tuningMsgNow.isSet() && !_tuningMsgNow.empty()) {
             uint32_t showedTime = millisNow - _tuningMsgNow.strStartAt;
             printStr(width() - 1, 0, _tuningMsgNow.c_str());
             if (showedTime > 2000) {
