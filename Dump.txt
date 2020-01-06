@@ -1,27 +1,14 @@
-xception (3):
-epc1=0x40208e3a epc2=0x00000000 epc3=0x00000000 excvaddr=0x4025f470 depc=0x00000000
+Exception (3):
+epc1=0x40207dbd epc2=0x00000000 epc3=0x00000000 excvaddr=0x4025f4d4 depc=0x00000000
 
 >>>stack>>>
 
 ctx: cont
-sp: 3ffffcf0 end: 3fffffc0 offset: 01a0
-3ffffe90:  40000ea3 00000023 00000001 00000001  
-3ffffea0:  40202cf4 3fff3cec 00000000 00000000  
-3ffffeb0:  3fff0000 000b000f 80fffee0 3ffffed0  
-3ffffec0:  00000022 00000001 3fffff00 40214cac  
-3ffffed0:  80001fc8 00000300 000003f9 80101370  
-3ffffee0:  00000000 3fff39f4 80ffff54 3fff0300  
-3ffffef0:  00000000 80c6a7f0 00001b00 3fff10fc  
-3fffff00:  00000000 00000003 4bc6a7f0 00000000  
-3fffff10:  3ffe878e 00000074 40100c6a 2d4fdf3b  
-3fffff20:  00000000 3fffff54 3ffe852c 3fff045c  
-3fffff30:  3fffdad0 00000000 3fff0410 40209788  
-3fffff40:  3fff0000 00000001 80203a04 402254a4  
-3fffff50:  3fffdad0 3fff3900 0022002f 80003520  
-3fffff60:  007a1200 252a203e 80efef00 3fff3200  
-3fffff70:  00000000 80efeffe feefeffe feefeffe  
-3fffff80:  00000000 00000000 00000001 40100870  
-3fffff90:  3fffdad0 00000000 3fff10bc 3fff10fc  
-3fffffa0:  3fffdad0 00000000 3fff10bc 40215ec4  
+sp: 3ffffdc0 end: 3fffffc0 offset: 01a0
+3fffff60:  feefeffe feefeffe feefeffe feefeffe  
+3fffff70:  feefeffe feefeffe feefeffe feefeffe  
+3fffff80:  feefeffe feefeffe feefeffe feefeffe  
+3fffff90:  feefeffe feefeffe feefeffe 3fff10fc  
+3fffffa0:  3fffdad0 00000000 3fff10bc 40215ed4  
 3fffffb0:  feefeffe feefeffe 3ffe85e4 401019e1  
 <<<stack<<<

@@ -118,7 +118,7 @@ int32_t reportedAnalogValue = -1;
 
 int oldPowerState = -1;
 
-uint32_t ssdPins[] PROGMEM = {D1, D2, D5, D6};
+uint32_t ssdPins[] = {D1, D2, D5, D6};
 
 LedStripe* ledStripe = NULL;
 uint32_t lastLedStripeUpdate = 0;
@@ -784,7 +784,7 @@ void loop() {
             } else {
                 // Encoders
                 for (size_t enc = 0; enc < __countof(encoders); ++enc) {
-                    const char* ss = NULL;
+                    String ss;
                     if (encoders[enc] + 1 == ch) {
                         ss = "rotate_cw";
                     } else if (encoders[enc] + 2 == ch) {
@@ -795,6 +795,8 @@ void loop() {
                     if (ss != NULL) {
                         String s = "encoder_";
                         s += encoderNames[enc];
+                        
+                        // debugPrint(String("") + s + " " + ss);
 
                         String key = F("rotate_ccw");
                         sceleton::udpSend([&](Msg& m) {

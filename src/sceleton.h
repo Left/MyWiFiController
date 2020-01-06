@@ -808,6 +808,7 @@ void loop() {
             debugSerial->println(F("Decoding failed"));
         } else {
             if (messageBack.has_introduceYourself && messageBack.introduceYourself) {
+                debugSerial->println(String(F("We've been asked to introduce self, sending HELLO")));
                 sendHelloMsg();
             }
             if (messageBack.has_unixtime) {

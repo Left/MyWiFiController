@@ -9,7 +9,7 @@
                 "-jar",
                 "${workspaceFolder}/.vscode/EspStackTraceDecoder.jar",
                 "/Users/vridosh/.platformio/packages/toolchain-xtensa/bin/xtensa-lx106-elf-addr2line",
-                "${workspaceFolder}/.pio/build/d1mini/firmware.elf",
+                "${workspaceFolder}/.pio/build/wemos/firmware.elf",
                 "${workspaceFolder}/dump.txt"
             ],
             "options": {
