@@ -45,6 +45,8 @@ public:
     virtual void enableScreen(const boolean enabled) {}
     virtual boolean screenEnabled() { return false; }
     virtual void switchATX(const boolean on) {}
+    virtual void showScreenContent(std::vector<uint8_t>&& content, uint32_t width, uint32_t height, 
+        const ScreenOffset& offsetFrom, const ScreenOffset& offsetTo) {}
 };
 
 String fileToString(const String& fileName) {
@@ -300,6 +302,28 @@ pb_callback_t strDecode(String& str) {
     auto strRes = (String*)(&str);
     res.arg = strRes;
     res.funcs.decode = reinterpret_cast<decltype(res.funcs.decode)>(read_string);
+
+    return res;
+}
+
+bool read_byte_array(pb_istream_t *stream, const pb_field_t *field, void **arg) {
+    size_t byteLen = (stream == nullptr) ? 0 : stream->bytes_left;
+    if (byteLen > 0) {
+        std::vector<uint8_t>* strRes = reinterpret_cast<std::vector<uint8_t>*>(*arg);
+        strRes->resize(byteLen, 0);
+
+        if (!pb_read(stream, &(*strRes)[0], byteLen)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+pb_callback_t byteArrayDecode(std::vector<uint8_t>& content) {
+    pb_callback_t res = { 0 };
+    res.arg = (std::vector<uint8_t>*)(&content);
+    res.funcs.decode = reinterpret_cast<decltype(res.funcs.decode)>(read_byte_array);
 
     return res;
 }
@@ -802,6 +826,8 @@ void loop() {
         messageBack.ledBlinkColors = strDecode(ledBlinkColors);
         String ledValue;
         messageBack.ledValue = strDecode(ledValue);
+        std::vector<uint8_t> screenContent;
+        messageBack.screenContent.content = byteArrayDecode(screenContent);
 
         bool status = pb_decode(&stream, MsgBack_fields, &messageBack);
         if (!status) {
@@ -859,6 +885,14 @@ void loop() {
                     // new year
                     sink->runLedStripeEffect(decodeRGBWString(ledBaseColor.c_str())[0], decodeRGBWString(ledBlinkColors.c_str()), messageBack.ledPeriod);
                 }
+            }
+            if (messageBack.has_screenContent && messageBack.has_screenOffsetFrom && messageBack.has_screenOffsetTo) {
+                sink->showScreenContent(
+                    std::move(screenContent), 
+                    messageBack.screenContent.width, 
+                    messageBack.screenContent.height, 
+                    messageBack.screenOffsetFrom, 
+                    messageBack.screenOffsetTo);
             }
         }
     }

@@ -1,13 +1,14 @@
 #pragma once
 
 #include <algorithm>
+#include <list>
 
 #include "common.h"
 
 #include "fonts.h"
 #include "dateutil.h"
 
-#define NUM_MAX 4
+constexpr size_t NUM_MAX = 4;
 
 typedef const wchar_t* WSTR;
 typedef wchar_t* WSTR_MUTABLE;
@@ -156,7 +157,7 @@ public:
 class MsgToShow {
     WSTR_MUTABLE _msg = NULL;
 public:
-    int strStartAt = 0;
+    uint32_t strStartAt = 0;
     int _totalMsToShow = 0;
 
     WSTR c_str() {
@@ -245,7 +246,7 @@ public:
 class LcdScreen {
 
 private:
-    uint8_t screen[NUM_MAX * 8];
+    std::array<uint8_t, NUM_MAX*8> screen;
 
     uint32_t nextShowDateInMs = millis() + 5000;
 
@@ -265,7 +266,7 @@ public:
     static const int secInUs = 1000000;
 
     LcdScreen() {
-        memset(screen, 0, sizeof(screen));
+        screen.fill(0);
     }
 
     bool fits(int x, int y) {
@@ -308,7 +309,7 @@ public:
     }
 
     void clear() {
-        memset(screen, 0, sizeof(screen));
+        screen.fill(0);
     }
 
     uint8_t line8(int l) const {
@@ -382,6 +383,22 @@ public:
         return ww;
     }
 
+    struct ScreenContent {
+        std::vector<uint8_t> content;
+        uint32_t contentWidth;
+        uint32_t contentHeight;
+        ScreenOffset offsetFrom;
+        ScreenOffset offsetTo;
+    };
+
+    std::list<ScreenContent> screenContents;
+
+    void showScreenContent(std::vector<uint8_t>&& content_, uint32_t width_, uint32_t height_, 
+        const ScreenOffset& offsetFrom_, const ScreenOffset& offsetTo_) {
+        ScreenContent sc = {content_, width_, height_, offsetFrom_, offsetTo_};
+        screenContents.emplace_back(sc);
+    }
+
     /**
      * Prints string and returns printed string width
      */
@@ -423,7 +440,39 @@ public:
      * micros is current time in microseconds
      */
     void showTime(uint32_t daysSince1970, uint32_t millisSince1200) {
-        int millisNow = millis();
+        uint32_t millisNow = millis();
+
+        // clear();
+        bool contentDrawn = false;
+        for (const auto& sc : screenContents) {
+            if (sc.offsetFrom.atMs <= millisNow && sc.offsetTo.atMs >= millisNow) {
+
+                int now = (millisNow - sc.offsetFrom.atMs);
+                int total = (sc.offsetTo.atMs - sc.offsetFrom.atMs);
+                int offsetX = sc.offsetFrom.x + (sc.offsetTo.x - sc.offsetFrom.x) * now / total;
+                int offsetY = sc.offsetFrom.y + (sc.offsetTo.y - sc.offsetFrom.y) * now / total;
+
+                uint32_t ind = 0;
+                for (uint32_t y = 0; y < sc.contentHeight; ++y) {
+                    for (uint32_t x = 0; x < sc.contentWidth; ++x, ++ind) {
+                        int dstX = x + offsetX;
+                        int dstY = y + offsetY;
+                        set(dstX, dstY, ((sc.content[ind >> 3] >> (ind & 0b111)) & 1) == 1);
+                    }
+                }
+
+                contentDrawn = true;
+            }
+        }
+
+        for (;!screenContents.empty() && screenContents.front().offsetTo.atMs < millisNow;) {
+            screenContents.pop_front();
+        }
+
+        if (contentDrawn) {
+            return;
+        }
+
         if (_tuningMsgNow.isSet() && !_tuningMsgNow.empty()) {
             uint32_t showedTime = millisNow - _tuningMsgNow.strStartAt;
             printStr(width() - 1, 0, _tuningMsgNow.c_str());
@@ -435,8 +484,8 @@ public:
 
         if (_rollingMsg.isSet()) {
             int32_t waitBefore = 300;
-            int32_t showedTime = std::max(millisNow - _rollingMsg.strStartAt, (int32_t)0);
-            int32_t extraTime = _rollingMsg._totalMsToShow == 0 ? 300 : std::max(_rollingMsg._totalMsToShow - showedTime - waitBefore, (int32_t)0);
+            int32_t showedTime = std::max((int)millisNow - (int)_rollingMsg.strStartAt, 0);
+            int32_t extraTime = _rollingMsg._totalMsToShow == 0 ? 300 : std::max((int)_rollingMsg._totalMsToShow - (int)showedTime - (int)waitBefore, 0);
             int32_t strW = getStrWidth(_rollingMsg.c_str());
             int32_t timeToShow = ((strW - 32) * _scrollSpeed);
             int32_t x = 0;

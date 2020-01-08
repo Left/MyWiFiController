@@ -433,6 +433,11 @@ void setup() {
         virtual void playMp3(uint32_t index) {
             dfPlayerSend(0x03, (uint16_t)index);  //
         }
+
+        virtual void showScreenContent(std::vector<uint8_t>&& content, uint32_t width, uint32_t height, 
+            const ScreenOffset& offsetFrom, const ScreenOffset& offsetTo) {
+            screen.showScreenContent(std::move(content), width, height, offsetFrom, offsetTo);
+        }
     };
 
     sceleton::setup(new SinkImpl());
