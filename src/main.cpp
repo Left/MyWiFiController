@@ -111,6 +111,10 @@ uint32_t initialUnixTime = 0;
 uint32_t restartAt = ULONG_MAX;
 uint32_t nextPotentiometer = 0;
 
+uint32_t lastHCSR = 0;
+uint32_t lastHCSR2 = 0;
+std::vector<uint32_t> destinies;
+
 uint16_t analogInValues[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 uint8_t analogReadIndex = 0;
 
@@ -124,6 +128,13 @@ LedStripe* ledStripe = NULL;
 uint32_t lastLedStripeUpdate = 0;
 
 void ICACHE_RAM_ATTR handleInterrupt() { interruptCounter++; }
+
+uint32_t d7start;
+uint32_t d7changes;
+
+void ICACHE_RAM_ATTR handleInterruptHCSR() {
+    d7changes = micros();
+}
 
 boolean encoderPinChanged = false;
 
@@ -330,10 +341,6 @@ void setup() {
                                   ? ~currRelayState
                                   : currRelayState));
             }
-
-            if (sceleton::hasGPIO1Relay.isSet()) {
-                digitalWrite(D4, val);
-            }
         }
 
         virtual void showMessage(const char* dd, int totalMsToShow) {
@@ -405,6 +412,9 @@ void setup() {
 
         virtual void enableScreen(const boolean enabled) {
             isScreenEnabled = enabled;
+            if (sceleton::hasGPIO1Relay.isSet()) {
+                digitalWrite(D8, enabled ? 1 : 0);
+            }
         }
 
         virtual boolean screenEnabled() { return isScreenEnabled; }
@@ -559,6 +569,13 @@ void setup() {
     }
 
     if (sceleton::hasGPIO1Relay.isSet()) {
+        pinMode(D8, OUTPUT);
+    }
+
+    if (sceleton::hasHC_SR.isSet()) {
+        pinMode(D6, OUTPUT);
+        pinMode(D7, INPUT);
+        attachInterrupt(digitalPinToInterrupt(D7), handleInterruptHCSR, FALLING);
     }
 
     if (sceleton::hasBluePill.isSet()) {
@@ -593,6 +610,30 @@ long lastStripeFrame = millis();
 
 long lastLoop = millis();
 long lastLoopEnd = millis();
+
+
+unsigned long Mypulsein(int pin, int level) {
+  int i = 0;
+  unsigned long start, startImp, finishImp;
+  start =  millis();
+  startImp =  micros();
+  finishImp =  micros();
+  do {
+    if (digitalRead(pin)==level){
+      i = 1;
+      startImp =  micros();
+    }
+  } while((i==0)&&((millis()-start)<500));
+  i = 0;
+  do {
+    if (digitalRead(pin)!=level){
+      i = 1;
+      finishImp =  micros();
+    }
+  } while((i==0)&&((millis()-start)<1000));
+ 
+  return finishImp - startImp;
+}
 
 void loop() {
     if (millis() - lastLoop > 50) {
@@ -988,6 +1029,31 @@ void loop() {
 
                 protobuf.resize(out - bufferStart);
             }
+        }
+    }
+
+    if (sceleton::hasHC_SR.isSet()) {
+        if ((millis() - lastHCSR > 25)) {
+            lastHCSR = millis();
+            int32_t sz = (d7changes - d7start);
+
+            d7start = micros();
+
+            digitalWrite(D6, LOW);
+            delayMicroseconds(2);
+            digitalWrite(D6, HIGH);
+            delayMicroseconds(10);
+            digitalWrite(D6, LOW);
+
+            destinies.push_back(sz);
+        }
+        if ((millis() - lastHCSR2 > 250)) {
+            lastHCSR2 = millis();
+
+            sceleton::udpSend([&](Msg& msg) {
+                    msg.destinies = sceleton::repeated_int(destinies);
+                });
+            destinies.resize(0);
         }
     }
 

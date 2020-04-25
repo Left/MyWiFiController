@@ -210,6 +210,7 @@ BoolDevParam hasATXPowerSupply("hasATXPowerSupply", "atx", "Has ATX power supply
 DevParam relayNames("relay.names", "relays", "Relay names, separated by ;", "");
 //DevParam relayNames("relay.names", "relays", "Relay names, separated by ;", "Потолок;Лента");
 BoolDevParam hasGPIO1Relay("hasGPIO1Relay", "gpio1relay", "Has GPIO1 Relay", false);
+BoolDevParam hasHC_SR("hasHC_SR", "hcSR", "Has HC-SR04 distance metter", false);
 BoolDevParam hasPWMOnD0("hasPWMOnD0", "pwmOnD0", "Has PWM on D0", false);
 
 // uint32_t msBeforeRestart = atoi(secondsBeforeRestart.value());
@@ -242,6 +243,7 @@ DevParam* devParams[] = {
     &hasSolidStateRelay,
     &hasATXPowerSupply,
     &hasPWMOnD0,
+    &hasHC_SR,
     // &secondsBeforeRestart
 }; 
 
