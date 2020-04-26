@@ -132,7 +132,7 @@ void ICACHE_RAM_ATTR handleInterrupt() { interruptCounter++; }
 uint32_t d7start;
 uint32_t d7changes;
 
-void ICACHE_RAM_ATTR handleInterruptHCSR() {
+void ICACHE_RAM_ATTR handleInterruptHCSRfall() {
     d7changes = micros();
 }
 
@@ -575,7 +575,7 @@ void setup() {
     if (sceleton::hasHC_SR.isSet()) {
         pinMode(D6, OUTPUT);
         pinMode(D7, INPUT);
-        attachInterrupt(digitalPinToInterrupt(D7), handleInterruptHCSR, FALLING);
+        attachInterrupt(digitalPinToInterrupt(D7), handleInterruptHCSRfall, FALLING);
     }
 
     if (sceleton::hasBluePill.isSet()) {
@@ -1035,17 +1035,19 @@ void loop() {
     if (sceleton::hasHC_SR.isSet()) {
         if ((millis() - lastHCSR > 25)) {
             lastHCSR = millis();
-            int32_t sz = (d7changes - d7start);
 
-            d7start = micros();
+            // debugSerial->println(String((int32_t) (d7changes - d7start), DEC));
+
+            int32_t sz = (d7changes - d7start);
+            destinies.push_back(sz);
 
             digitalWrite(D6, LOW);
-            delayMicroseconds(2);
+            delayMicroseconds(5);
             digitalWrite(D6, HIGH);
             delayMicroseconds(10);
             digitalWrite(D6, LOW);
 
-            destinies.push_back(sz);
+            d7start = d7changes = micros() + 600;
         }
         if ((millis() - lastHCSR2 > 250)) {
             lastHCSR2 = millis();
