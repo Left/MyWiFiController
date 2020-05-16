@@ -22,6 +22,7 @@ Stream* debugSerial;
 
 void debugPrint(const String& str);
 
+
 namespace sceleton {
 
 class Sink {
@@ -200,7 +201,9 @@ BoolDevParam hasDFPlayer("hasDFPlayer", "dfplayer", "Has DF player", false);
 BoolDevParam hasBME280("hasBME280", "bme280", "Has BME280 (temp & humidity sensor)", false);
 BoolDevParam hasLedStripe("hasLedStripe", "ledstrip", "Has RGBW Led stripe", false);
 BoolDevParam hasBluePill("hasBluePill", "bluepill", "Has bluepill", false);
-BoolDevParam hasButton("hasButton", "d7btn", "Has button on D7", false);
+BoolDevParam hasButton("hasButtonD7", "d7btn", "Has button on D7", false);
+BoolDevParam hasButtonD2("hasButtonD2", "d0btn", "Has button on D0", false);
+BoolDevParam hasButtonD5("hasButtonD5", "d5btn", "Has button on D5", false);
 DevParam brightness("brightness", "bright", "Brightness [0..100]", "0");
 BoolDevParam hasEncoders("hasEncoders", "enc", "Has encoders", false);
 BoolDevParam hasMsp430("hasMsp430WithEncoders", "msp430", "Has MSP430 with encoders", false);
@@ -235,6 +238,8 @@ DevParam* devParams[] = {
     &hasBluePill,
     &hasEncoders,
     &hasButton, 
+    &hasButtonD2,
+    &hasButtonD5,
     &brightness,
     &hasMsp430,
     &relayNames,
@@ -656,13 +661,9 @@ void setup(Sink* _sink) {
             needReboot = needReboot || n;
         }
         
-        if (needReboot) {
-            saveSettings();
-            request->send(200, String(F("text/html")), String(F("Settings changed, rebooting in 2 seconds...")));
-            rebootAt = millis() + 2000;
-        } else {
-            request->send(200, String(F("text/html")), String(F("Nothing changed.")));  
-        }
+        saveSettings();
+        request->send(200, String(F("text/html")), String(F("Settings changed, rebooting in 2 seconds...")));
+        rebootAt = millis() + 2000;
     });
     setupServer->on("/", [](AsyncWebServerRequest *request) {
         String content = F("<!DOCTYPE HTML>\r\n<html>");
@@ -714,7 +715,7 @@ void loop() {
         debugSerial->println(String(F("Start scanning")));
         WiFi.scanNetworks(true);
 
-        nextWiFiScan = millis() + 60000; // Scan every 10 seconds
+        nextWiFiScan = millis() + 600000; // Scan every 10 seconds
     }
 
     int n = WiFi.scanComplete();

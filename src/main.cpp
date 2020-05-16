@@ -14,7 +14,6 @@
 #include "ledStripe.h"
 #include <SoftwareSerial.h>
 
-
 unsigned int localPort = 2390;  // local port to listen for UDP packets
 
 const uint64_t dayInMs = 24 * 60 * 60 * 1000;
@@ -104,7 +103,9 @@ struct PWMState {
 
 PWMState pwmStates[] = { PWMState(D3), PWMState(D4), PWMState(D7), PWMState(D6), PWMState(D5) };
 
-int interruptCounter = 0;
+int interruptCounterD7 = 0;
+int interruptCounterD5 = 0;
+int interruptCounterD2 = 0;
 
 uint32_t timeRetreivedInMs = 0;
 uint32_t initialUnixTime = 0;
@@ -113,6 +114,7 @@ uint32_t nextPotentiometer = 0;
 
 uint32_t lastHCSR = 0;
 uint32_t lastHCSR2 = 0;
+uint32_t lastHCSRSent = 0;
 std::vector<uint32_t> destinies;
 
 uint16_t analogInValues[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -127,13 +129,38 @@ uint32_t ssdPins[] = {D1, D2, D5, D6};
 LedStripe* ledStripe = NULL;
 uint32_t lastLedStripeUpdate = 0;
 
-void ICACHE_RAM_ATTR handleInterrupt() { interruptCounter++; }
+void ICACHE_RAM_ATTR handleInterruptD7() { interruptCounterD7++; }
+void ICACHE_RAM_ATTR handleInterruptD2() { interruptCounterD2++; }
+void ICACHE_RAM_ATTR handleInterruptD5() { interruptCounterD5++; }
 
 uint32_t d7start;
 uint32_t d7changes;
 
+std::vector<uint32_t> d7millis;
+std::vector<bool> d7state;
+std::vector<bool> d6state;
+
+void writeHCRState(bool d6) {
+    noInterrupts();
+    auto d7 = digitalRead(D7);
+    // auto d6 = digitalRead(D6);
+    if (d7state.empty() || d6state.empty() || 
+        d7state.back() != d7 || d6state.back() != d6) { 
+        d7state.push_back(d7);
+        d6state.push_back(d6);
+        d7millis.push_back(micros());
+    }
+    interrupts();
+}
+
+uint32_t hcsrStart = micros();
+uint32_t hcsrDist = 0;
+
 void ICACHE_RAM_ATTR handleInterruptHCSRfall() {
-    d7changes = micros();
+    if (hcsrDist == 0) {
+        hcsrDist = micros() - hcsrStart;
+    }
+    // writeHCRState(false);
 }
 
 boolean encoderPinChanged = false;
@@ -513,7 +540,17 @@ void setup() {
 
     if (sceleton::hasButton.isSet()) {
         pinMode(D7, INPUT_PULLUP);
-        attachInterrupt(digitalPinToInterrupt(D7), handleInterrupt, CHANGE);
+        attachInterrupt(digitalPinToInterrupt(D7), handleInterruptD7, CHANGE);
+    }
+
+    if (sceleton::hasButtonD2.isSet()) {
+        pinMode(D2, INPUT_PULLUP);
+        attachInterrupt(digitalPinToInterrupt(D2), handleInterruptD2, CHANGE);
+    }
+
+    if (sceleton::hasButtonD5.isSet()) {
+        pinMode(D5, INPUT_PULLUP);
+        attachInterrupt(digitalPinToInterrupt(D5), handleInterruptD5, CHANGE);
     }
 
     if (sceleton::hasEncoders.isSet()) {
@@ -651,12 +688,26 @@ void loop() {
         ESP.restart();
     }
 
-    if (interruptCounter > 0) {
+    if (interruptCounterD7 > 0) {
         sceleton::udpSend([&](Msg& m) {
-            m.has_buttonPressed = true;
-            m.buttonPressed = digitalRead(D7) == LOW;
+            m.has_buttonPressedD7 = true;
+            m.buttonPressedD7 = digitalRead(D7) == LOW;
         });
-        interruptCounter = 0;
+        interruptCounterD7 = 0;
+    }
+    if (interruptCounterD5 > 0) {
+        sceleton::udpSend([&](Msg& m) {
+            m.has_buttonPressedD5 = true;
+            m.buttonPressedD5 = digitalRead(D5) == LOW;
+        });
+        interruptCounterD5 = 0;
+    }
+    if (interruptCounterD2 > 0) {
+        sceleton::udpSend([&](Msg& m) {
+            m.has_buttonPressedD2 = true;
+            m.buttonPressedD2 = digitalRead(D2) == LOW;
+        });
+        interruptCounterD2 = 0;
     }
 
     if (sceleton::hasHX711.isSet() &&
@@ -1033,30 +1084,53 @@ void loop() {
     }
 
     if (sceleton::hasHC_SR.isSet()) {
-        if ((millis() - lastHCSR > 25)) {
+        if ((millis() - lastHCSR > 15)) {
             lastHCSR = millis();
-
-            // debugSerial->println(String((int32_t) (d7changes - d7start), DEC));
-
-            int32_t sz = (d7changes - d7start);
-            destinies.push_back(sz);
 
             digitalWrite(D6, LOW);
             delayMicroseconds(5);
             digitalWrite(D6, HIGH);
             delayMicroseconds(10);
             digitalWrite(D6, LOW);
-
-            d7start = d7changes = micros() + 600;
+            
+            writeHCRState(true);
+            hcsrStart = micros();
+            hcsrDist = 0;
         }
-        if ((millis() - lastHCSR2 > 250)) {
-            lastHCSR2 = millis();
+
+        if (hcsrDist != 0) {
+            if (hcsrDist < 3500) {
+                // debugSerial->println(String(hcsrDist, DEC));
+                sceleton::udpSend([&](Msg& msg) {
+                    msg.has_hcsrOn = true;
+                    msg.hcsrOn = true;
+                });
+
+                lastHCSR2 = millis();
+            }
+            
+            destinies.push_back(hcsrDist);
+            hcsrDist = 0;
+        }
+
+        if ((millis() - 400) > lastHCSR2) {
+            lastHCSR2 = 0xFFFFFFFF;
+           
+            sceleton::udpSend([&](Msg& msg) {
+                msg.has_hcsrOn = true;
+                msg.hcsrOn = false;
+            });
+        }
+
+        if ((millis() - lastHCSRSent > 200)) {
+            lastHCSRSent = millis();
 
             sceleton::udpSend([&](Msg& msg) {
                     msg.destinies = sceleton::repeated_int(destinies);
                 });
             destinies.resize(0);
         }
+
     }
 
     if (millis() % 500 == 12) {
