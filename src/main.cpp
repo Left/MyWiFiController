@@ -9,7 +9,10 @@
 
 #include <OneWire.h>
 #include <Q2HX711.h>
+
+#ifndef ESP01
 #include "lcd.h"
+#endif
 
 #include "ledStripe.h"
 #include <SoftwareSerial.h>
@@ -20,8 +23,10 @@ const uint64_t dayInMs = 24 * 60 * 60 * 1000;
 
 boolean isScreenEnabled = true;
 
+#ifndef ESP01
 LcdScreen screen;
 MAX72xx* screenController = NULL;
+#endif // ESP01
 
 Adafruit_BME280* bme = NULL;  // I2C
 
@@ -373,25 +378,32 @@ void setup() {
         virtual void showMessage(const char* dd, int totalMsToShow) {
             if (dd != nullptr) {
                 debugSerial->println(dd);
-
+#ifndef ESP01
                 //
                 screen.showMessage(dd, totalMsToShow);
+#endif // ESP01
             }
         }
 
         virtual void showTuningMsg(const char* dd) {
+#ifndef ESP01
             screen.showTuningMsg(dd);
+#endif // ESP01
         }
 
         virtual void setAdditionalInfo(const char* dd) {
+#ifndef ESP01
             //
             screen.setAdditionalInfo(dd);
+#endif // ESP01
         }
 
         virtual void setBrightness(int percents) {
+#ifndef ESP01
             if (screenController != NULL) {
                 screenController->setBrightness(percents);
             }
+#endif // ESP01
         }
 
         virtual void setTime(uint32_t unixTime) {
@@ -423,7 +435,7 @@ void setup() {
             if (restartAt - millis() >= 200) {
                 if (restartReportedAt < millis()) {
                     restartReportedAt = millis() + 300;
-
+#ifndef ESP01
                     if (screenController != NULL) {
                         debugPrint("Rebooting");
                         screen.clear();
@@ -432,6 +444,7 @@ void setup() {
                         screenController->refreshAll();
                     }
                     // sceleton::webSocketClient->disconnect();
+#endif // ESP01
                 }
                 restartAt = millis() + 200;
             }
@@ -473,7 +486,24 @@ void setup() {
 
         virtual void showScreenContent(std::vector<uint8_t>&& content, uint32_t width, uint32_t height, 
             const ScreenOffset& offsetFrom, const ScreenOffset& offsetTo) {
+#ifndef ESP01
             screen.showScreenContent(std::move(content), width, height, offsetFrom, offsetTo);
+#endif // ESP01
+        }
+
+        virtual void forwardToBluepill(const uint8_t* content, size_t size) {
+            if (sceleton::hasBluePill.isSet()) {
+                // 
+                struct Signature {
+                    uint8_t start0;
+                    uint8_t start1;
+                    uint8_t start2;
+                    uint8_t start3;
+                    size_t size;
+                } sig = { 42, 19, 53, 11, size };
+                Serial.write((const uint8_t*)&sig, (size_t)8);
+                Serial.write(content, size);
+            }
         }
     };
 
@@ -530,6 +560,7 @@ void setup() {
         hx711 = new Q2HX711(D5, D6);
     }
 
+#ifndef ESP01
     // Initialize comms hardware
     // pinMode(BEEPER_PIN, OUTPUT);
     if (sceleton::hasScreen.isSet()) {
@@ -537,6 +568,7 @@ void setup() {
             screen, D5, D7, D6, sceleton::hasScreen180Rotated.isSet());
         screenController->setup();
     }
+#endif // ESP01
 
     if (sceleton::hasButton.isSet()) {
         pinMode(D7, INPUT_PULLUP);
@@ -802,6 +834,7 @@ void loop() {
     oldMicros = micros();
     testCntr++;
 
+#ifndef ESP01
     if (screenController != NULL) {
         if (millis() > (lastScreenRefresh + 20)) {
             lastScreenRefresh = millis();
@@ -832,6 +865,7 @@ void loop() {
             }
         }
     }
+#endif // ESP01
 
     if (sceleton::hasIrReceiver.isSet()) {
         auto irPause = (int64_t)millis() - lastIRChangeMs;

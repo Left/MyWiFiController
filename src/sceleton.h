@@ -7,8 +7,6 @@
 #include <FS.h>
 #include <ArduinoJson.h>
 #include <ESP8266WiFi.h>
-#include <WebSockets.h>
-#include <WebSocketsClient.h>
 #include <ESPAsyncWebServer.h>
 #include <WiFiUDP.h>
 #include <ArduinoOTA.h>
@@ -48,6 +46,7 @@ public:
     virtual void switchATX(const boolean on) {}
     virtual void showScreenContent(std::vector<uint8_t>&& content, uint32_t width, uint32_t height, 
         const ScreenOffset& offsetFrom, const ScreenOffset& offsetTo) {}
+    virtual void forwardToBluepill(const uint8_t* content, size_t size) {}
 };
 
 String fileToString(const String& fileName) {
@@ -816,6 +815,8 @@ void loop() {
         // debugSerial->println("RECEIVED UDP " + String(bytesInUdbBuf, DEC));
         buffer.resize(bytesInUdbBuf + 1, 0);
         auto wasRead = udpClient.readBytes(&buffer[0], bytesInUdbBuf);
+
+        sink->forwardToBluepill(&buffer[0], wasRead);
 
         // debugSerial->println("Decoding " + String(wasRead, DEC));
         pb_istream_t stream = pb_istream_from_buffer(&buffer[0], wasRead);
