@@ -16,6 +16,8 @@
 #include <pb_decode.h>
 #include "protocol.pb.h"
 
+#include "uart.h"
+
 Stream* debugSerial;
 
 void debugPrint(const String& str);
@@ -46,7 +48,8 @@ public:
     virtual void switchATX(const boolean on) {}
     virtual void showScreenContent(std::vector<uint8_t>&& content, uint32_t width, uint32_t height, 
         const ScreenOffset& offsetFrom, const ScreenOffset& offsetTo) {}
-    virtual void forwardToBluepill(const uint8_t* content, size_t size) {}
+
+    virtual void forwardBluePillMsg(const uint8_t* msg, size_t sz) {}
 };
 
 String fileToString(const String& fileName) {
@@ -191,8 +194,11 @@ BoolDevParam logToHardwareSerial("debug.to.serial", "debugserial", "Print debug 
 DevParam websocketServer("websocket.server", "ws", "WebSocket server", "192.168.121.38");
 DevParam websocketPort("websocket.port", "wsport", "WebSocket port", "8080");
 BoolDevParam invertRelayControl("invertRelay", "invrelay", "Invert relays", false);
+#ifndef ESP01
 BoolDevParam hasScreen("hasScreen", "screen", "Has screen", false);
 BoolDevParam hasScreen180Rotated("hasScreen180Rotated", "screen180", "Screen is rotated on 180", false);
+DevParam brightness("brightness", "bright", "Brightness [0..100]", "0");
+#endif // ESP01
 BoolDevParam hasHX711("hasHX711", "hx711", "Has HX711 (weight detector)", false);
 BoolDevParam hasIrReceiver("hasIrReceiver", "ir", "Has infrared receiver", false);
 BoolDevParam hasDS18B20("hasDS18B20", "ds18b20", "Has DS18B20 (temp sensor)", false);
@@ -203,7 +209,6 @@ BoolDevParam hasBluePill("hasBluePill", "bluepill", "Has bluepill", false);
 BoolDevParam hasButton("hasButtonD7", "d7btn", "Has button on D7", false);
 BoolDevParam hasButtonD2("hasButtonD2", "d0btn", "Has button on D0", false);
 BoolDevParam hasButtonD5("hasButtonD5", "d5btn", "Has button on D5", false);
-DevParam brightness("brightness", "bright", "Brightness [0..100]", "0");
 BoolDevParam hasEncoders("hasEncoders", "enc", "Has encoders", false);
 BoolDevParam hasMsp430("hasMsp430WithEncoders", "msp430", "Has MSP430 with encoders", false);
 BoolDevParam hasPotenciometer("hasPotenciometer", "potent", "Has ADC connected", false);
@@ -226,8 +231,11 @@ DevParam* devParams[] = {
     &websocketServer, 
     &websocketPort, 
     &invertRelayControl, 
+#ifndef ESP01
     &hasScreen, 
     &hasScreen180Rotated,
+    &brightness,
+#endif // ESP01
     &hasHX711,
     &hasIrReceiver,
     &hasDS18B20,
@@ -239,7 +247,6 @@ DevParam* devParams[] = {
     &hasButton, 
     &hasButtonD2,
     &hasButtonD5,
-    &brightness,
     &hasMsp430,
     &relayNames,
     &hasGPIO1Relay,
@@ -313,7 +320,9 @@ pb_callback_t strDecode(String& str) {
 }
 
 bool read_byte_array(pb_istream_t *stream, const pb_field_t *field, void **arg) {
-    size_t byteLen = (stream == nullptr) ? 0 : stream->bytes_left;
+    uint32_t byteLen = 0;
+    pb_decode_varint32(stream, &byteLen);
+
     if (byteLen > 0) {
         std::vector<uint8_t>* strRes = reinterpret_cast<std::vector<uint8_t>*>(*arg);
         strRes->resize(byteLen, 0);
@@ -816,8 +825,6 @@ void loop() {
         buffer.resize(bytesInUdbBuf + 1, 0);
         auto wasRead = udpClient.readBytes(&buffer[0], bytesInUdbBuf);
 
-        sink->forwardToBluepill(&buffer[0], wasRead);
-
         // debugSerial->println("Decoding " + String(wasRead, DEC));
         pb_istream_t stream = pb_istream_from_buffer(&buffer[0], wasRead);
         messageBack = messageBack_empty;
@@ -844,6 +851,13 @@ void loop() {
             if (messageBack.has_unixtime) {
                 sink->setTime(messageBack.unixtime);
             }
+            if (messageBack.has_bluePillMsg) {
+                sink->forwardBluePillMsg(
+                    &messageBack.bluePillMsg.content.bytes[0], 
+                    messageBack.bluePillMsg.content.size);
+            }
+
+#ifndef ESP01
             if (textToShow.length() > 0) {
                 if (messageBack.showType == MsgBack_ShowType_SHOW) {
                     sink->showMessage(textToShow.c_str(), messageBack.timeMsToShow);
@@ -853,6 +867,7 @@ void loop() {
                     sink->setAdditionalInfo(textToShow.c_str());
                 }
             }
+#endif // ESP01
             if (messageBack.has_reboot && messageBack.reboot) {
                 sink->reboot();
             }
@@ -869,6 +884,7 @@ void loop() {
             if (messageBack.has_volume) {
                 sink->setVolume(messageBack.volume);
             }
+#ifndef ESP01
             if (messageBack.has_screenEnable) {
                 sink->enableScreen(messageBack.screenEnable);
             }
@@ -877,6 +893,7 @@ void loop() {
                 sink->setBrightness(val);
                 brightness.setValue(String(val, DEC));
             }
+#endif // ESP01
             if (messageBack.has_pwmPeriod && messageBack.has_pwmPin && messageBack.has_pwmValue) {
                 uint8_t pinIndex = dpin[messageBack.pwmPin];
 

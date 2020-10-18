@@ -1,5 +1,7 @@
 #include "sceleton.h"
 
+#include <memory>
+
 #include <Adafruit_BME280.h>
 #include <Adafruit_NeoPixel.h>
 #include <Adafruit_Sensor.h>
@@ -324,6 +326,9 @@ Encoder encoders[] = {
     Encoder("right", D5, D6, D7),
 };
 
+std::unique_ptr<uart::Sender> bpSender;
+std::unique_ptr<uart::Receiver> bpReceiver;
+
 void setup() {
     class SinkImpl : public sceleton::Sink {
        private:
@@ -491,18 +496,10 @@ void setup() {
 #endif // ESP01
         }
 
-        virtual void forwardToBluepill(const uint8_t* content, size_t size) {
-            if (sceleton::hasBluePill.isSet()) {
-                // 
-                struct Signature {
-                    uint8_t start0;
-                    uint8_t start1;
-                    uint8_t start2;
-                    uint8_t start3;
-                    size_t size;
-                } sig = { 42, 19, 53, 11, size };
-                Serial.write((const uint8_t*)&sig, (size_t)8);
-                Serial.write(content, size);
+        virtual void forwardBluePillMsg(const uint8_t* msg, size_t sz) {
+            // 
+            if (bpSender) {
+                bpSender->send(msg, sz);
             }
         }
     };
@@ -649,6 +646,11 @@ void setup() {
 
     if (sceleton::hasBluePill.isSet()) {
         debugSerial = new sceleton::DummySerial();
+        bpSender.reset(new uart::Sender(
+            [&](const uint8_t* buffer, size_t size) {
+                return Serial.write(buffer, size);
+            }
+        ));
 
         Serial.begin(460800);
     }
@@ -1082,39 +1084,7 @@ void loop() {
     }
 
     if (sceleton::hasBluePill.isSet()) {
-        size_t avail = Serial.available();
-        if (avail > 0) {
-            size_t olds = protobuf.size();
-            protobuf.resize(olds + avail);            
-            Serial.readBytes(&protobuf[olds], avail);
 
-            uint8_t* bufferStart = &protobuf[0];
-            uint8_t* bufferEnd = bufferStart + protobuf.size();
-
-            uint8_t* startSeq = std::search(bufferStart, bufferEnd,
-                &bluePillPacketStart[0], &bluePillPacketStart[0] + __countof(bluePillPacketStart));
-            uint8_t* endSeq = std::search(bufferStart, bufferEnd,
-                &bluePillPacketEnd[0], &bluePillPacketEnd[0] + __countof(bluePillPacketEnd));
-            
-            if ((startSeq != bufferEnd) && (endSeq != bufferEnd)) {               
-                sceleton::udpClient.beginPacket(
-                    sceleton::websocketServer.value(), 
-                    atoi(sceleton::websocketPort.value()) + 1);
-                for (const uint8_t* p = startSeq + __countof(bluePillPacketStart);
-                    p != endSeq; ++p) {
-                    sceleton::udpClient.write(*p);
-                }
-                sceleton::udpClient.endPacket();
-                
-                uint8_t* out = bufferStart;
-                for (const uint8_t* p = endSeq + __countof(bluePillPacketEnd);
-                    p != bufferEnd; ++p, ++out) {
-                    *out = *p;
-                }
-
-                protobuf.resize(out - bufferStart);
-            }
-        }
     }
 
     if (sceleton::hasHC_SR.isSet()) {
