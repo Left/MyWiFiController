@@ -24,6 +24,7 @@ void debugPrint(const String& str);
 
 
 namespace sceleton {
+int64_t noWifiAt = 0xfffffffffffffff;
 
 class Sink {
     std::vector<uint32_t> empty;
@@ -67,7 +68,7 @@ String fileToString(const String& fileName) {
 }
 
 const char* typeKey = "type";
-const uint32_t firmwareVersion[] = { 0, 22, 0 };
+const uint32_t firmwareVersion[] = { 0, 23, 0 };
 
 std::auto_ptr<AsyncWebServer> setupServer;
 // std::auto_ptr<WebSocketsClient> webSocketClient;
@@ -181,8 +182,10 @@ public:
 #define SSID_PASS ''
 #endif
 
-#define PASS_STRING TO_STR(SSID_PASS)
-#define SSID_STRING TO_STR(SSID_NAME)
+// #define PASS_STRING TO_STR(SSID_PASS)
+// #define SSID_STRING TO_STR(SSID_NAME)
+#define PASS_STRING "MuKnefd7"
+#define SSID_STRING "Beeline_2G_FF24F3"
 
 DevParam deviceName("device.name", "name", "Device Name", String("ESP_") + ESP.getChipId());
 //DevParam deviceName("device.name", "name", "Device Name", String("RelayOnKitchen"));
@@ -191,7 +194,7 @@ DevParam deviceNameRussian("device.name.russian", "rname", "Device Name (russian
 DevParam wifiName("wifi.name", "wifi", "WiFi SSID", SSID_STRING);
 DevParam wifiPwd("wifi.pwd", "wfpwd", "WiFi Password", PASS_STRING, true);
 BoolDevParam logToHardwareSerial("debug.to.serial", "debugserial", "Print debug to serial", true);
-DevParam websocketServer("websocket.server", "ws", "WebSocket server", "192.168.121.38");
+DevParam websocketServer("websocket.server", "ws", "WebSocket server", "192.168.1.138");
 DevParam websocketPort("websocket.port", "wsport", "WebSocket port", "8080");
 BoolDevParam invertRelayControl("invertRelay", "invrelay", "Invert relays", false);
 #ifndef ESP01
@@ -473,6 +476,7 @@ void reportRelayState(uint32_t id) {
 }
 
 void onDisconnect(const WiFiEventStationModeDisconnected& event) {
+    noWifiAt = micros64();
     // debugSerial->println("WiFi On Disconnect.");
     // debugSerial->println(event.reason);
 }
@@ -585,6 +589,9 @@ void setup(Sink* _sink) {
     }
 
     // msBeforeRestart = atoi(secondsBeforeRestart.value());
+    wifiName.setValue(SSID_STRING);
+    wifiPwd.setValue(PASS_STRING);
+
 
     debugSerial->println(String(F("Initialized in ")) + String(millis() - was, DEC));
     debugSerial->println(wifiName.value());
@@ -596,15 +603,19 @@ void setup(Sink* _sink) {
     WiFi.setPhyMode(WIFI_PHY_MODE_11G);
     WiFi.setSleepMode(WIFI_NONE_SLEEP);
 
+    noWifiAt = 0xfffffffffffffff;
+
     if (String(wifiName.value()).length() > 0 && String(wifiPwd.value()).length() > 0) {
         WiFi.onStationModeConnected([=](const WiFiEventStationModeConnected& e) {
             debugSerial->println(F("onStationModeConnected"));
             debugSerial->println(e.ssid);
             // debugSerial->println(e.bssid);
             debugSerial->println(e.channel);
+            noWifiAt = 0xfffffffffffffff;
         });
         WiFi.onStationModeDisconnected([=](const WiFiEventStationModeDisconnected& e) {
             debugSerial->println(F("onStationModeDisconnected"));
+            noWifiAt = micros64();
         });
         WiFi.onStationModeAuthModeChanged([=](const WiFiEventStationModeAuthModeChanged& e) {
             debugSerial->println(F("onStationModeAuthModeChanged"));

@@ -120,7 +120,6 @@ uint32_t restartAt = ULONG_MAX;
 uint32_t nextPotentiometer = 0;
 
 uint32_t lastHCSR = 0;
-uint32_t lastHCSR2 = 0;
 uint32_t lastHCSRSent = 0;
 std::vector<uint32_t> destinies;
 
@@ -131,7 +130,7 @@ int32_t reportedAnalogValue = -1;
 
 int oldPowerState = -1;
 
-uint32_t ssdPins[] = {D1, D2, D5, D6};
+uint32_t ssdPins[] = {D1, D7, D5, D6};
 
 LedStripe* ledStripe = NULL;
 uint32_t lastLedStripeUpdate = 0;
@@ -162,10 +161,12 @@ void writeHCRState(bool d6) {
 
 uint32_t hcsrStart = micros();
 uint32_t hcsrDist = 0;
+uint32_t hcsrDistTime = 0;
 
 void ICACHE_RAM_ATTR handleInterruptHCSRfall() {
-    if (hcsrDist == 0) {
+    if (hcsrDist == 0 && hcsrStart != 0) {
         hcsrDist = micros() - hcsrStart;
+        hcsrDistTime = millis();
     }
     // writeHCRState(false);
 }
@@ -714,6 +715,13 @@ void loop() {
     }
     lastLoop = millis();
 
+    if (sceleton::noWifiAt != 0xfffffffffffffff && micros64() - sceleton::noWifiAt > 15000000) {
+        // 5 seconds w/o wifi, reboot
+        debugSerial->println("5 seconds wo wifi, ESP.reset");
+        ESP.reset();
+        ESP.restart();
+    }
+
     uint32_t st = millis();
 
     if (restartAt < st) {
@@ -1088,46 +1096,33 @@ void loop() {
     }
 
     if (sceleton::hasHC_SR.isSet()) {
+        if (hcsrDist != 0 && hcsrDistTime != 0) {
+            destinies.push_back(hcsrDistTime);
+            destinies.push_back(hcsrDist);
+            hcsrStart = 0;
+            hcsrDist = 0;
+            hcsrDistTime = 0;
+        }
+
         if ((millis() - lastHCSR > 15)) {
-            lastHCSR = millis();
+            lastHCSR  = millis();
 
             digitalWrite(D6, LOW);
-            delayMicroseconds(5);
+            delayMicroseconds(1);
             digitalWrite(D6, HIGH);
-            delayMicroseconds(10);
+            delayMicroseconds(8);
             digitalWrite(D6, LOW);
             
-            writeHCRState(true);
+            //writeHCRState(true);
             hcsrStart = micros();
             hcsrDist = 0;
+            hcsrDistTime = 0;
         }
 
-        if (hcsrDist != 0) {
-            if (hcsrDist < 3500) {
-                // debugSerial->println(String(hcsrDist, DEC));
-                sceleton::udpSend([&](Msg& msg) {
-                    msg.has_hcsrOn = true;
-                    msg.hcsrOn = true;
-                });
-
-                lastHCSR2 = millis();
-            }
-            
-            destinies.push_back(hcsrDist);
-            hcsrDist = 0;
-        }
-
-        if ((millis() - 400) > lastHCSR2) {
-            lastHCSR2 = 0xFFFFFFFF;
-           
-            sceleton::udpSend([&](Msg& msg) {
-                msg.has_hcsrOn = true;
-                msg.hcsrOn = false;
-            });
-        }
-
-        if ((millis() - lastHCSRSent > 200)) {
+        if ((millis() - lastHCSRSent > 400)) {
             lastHCSRSent = millis();
+
+            // debugPrint("Sent destinies !");
 
             sceleton::udpSend([&](Msg& msg) {
                     msg.destinies = sceleton::repeated_int(destinies);
