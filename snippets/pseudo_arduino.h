@@ -8,6 +8,9 @@
 #include <sstream>
 #include <unistd.h>
 
+#include <string.h>
+#include <stdlib.h>
+
 #define DEC 10
 #define HEX 16
 #define OCT 8
@@ -49,5 +52,5 @@ uint32_t micros() {
 }
 
 uint32_t millis() {
-    return micros() / 1000;
+    return micros64() / 1000ull;
 }

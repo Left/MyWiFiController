@@ -1,5 +1,6 @@
 #include "pseudo_arduino.h"
 
+#include "../src/protocol.pb.h"
 #include "../src/lcd.h"
 
 int main(int argc, char const *argv[]) {   
@@ -13,16 +14,31 @@ int main(int argc, char const *argv[]) {
 
     LcdScreen screen;
     screen._showDay = false;
-    screen.showMessage("Hello, it is a very-very-very-very long line");
+    // screen.showMessage("Hello, it is a very-very-very-very long line", 1000);
 
-    // screen.showMessage("ЁЁЁёёёЁЁЁёёё!");
+    // screen.showMessage("ЁЁЁёёёЁЁЁёёё!", 1000);
+    std::vector<unsigned char> content(32, 0xff);
+
+    ScreenOffset offsetFrom;
+    offsetFrom.x = 0;
+    offsetFrom.y = 0;
+    offsetFrom.atMs = micros64() / 1000ull;
+
+    ScreenOffset offsetTo;
+    offsetTo.x = 32;
+    offsetTo.y = 8;
+    offsetTo.atMs = offsetFrom.atMs + 1000;
+
+    screen.showScreenContent(std::move(content), 32, 8, offsetFrom, offsetTo);
 
     for (int ii = 0; ii < 1600; ++ii) {
         // Move cursor to top left
         putp( tparm( tigetstr((char *)"cup" ), 0, 0, 0, 0, 0, 0, 0, 0, 0 ) );
+        /*
         if (ii == 100) {
-            screen.showMessage("Another string");
+            screen.showMessage("Another string", 1000);
         }
+        */
         
         screen.clear();
 

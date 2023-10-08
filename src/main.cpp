@@ -227,6 +227,7 @@ void dfPlayerSend(uint8_t command, uint16_t argument) {
 
     dfplayerSerial->write(_sending, DFPLAYER_SEND_LENGTH);
     debugSerial->println(String(F("SENT")));
+    debugPrint(String(F("SENT")));
 }
 
 class Encoder {
@@ -970,12 +971,16 @@ void loop() {
         uint16_t parameter = arrayToUint16(_serial + Stack_Parameter);
         uint8_t cmd = _serial[Stack_Command];
 
+        debugSerial->println("RECV CMD " + String(cmd, HEX));
+
         switch (cmd) {
             case 0x41: {
                 debugSerial->println("ACK");
+                debugPrint("ACK");
             } break;
             case 0x43: {
                 debugSerial->println("Vol: " + String(parameter, DEC));
+                debugPrint("Vol" + String(parameter, DEC));
             } break;
             default: {
                 for (int i = 0; i < DFPLAYER_RECEIVED_LENGTH; ++i) {
@@ -1029,6 +1034,7 @@ void loop() {
             uint32_t dfBusy = (uint32_t)digitalRead(D3);
             if (dfBusy != dfBusyNow) {
                 debugSerial->println("DFPlayerBusy: " + String(dfBusy, DEC));
+                debugPrint("DFPlayerBusy: " + String(dfBusy, DEC));
                 if (dfBusy == 1) {
                     // Stopped playing, let's set volume to 0
                     // dfPlayerSend(0x06, (uint16_t)0);

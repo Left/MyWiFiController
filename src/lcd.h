@@ -443,9 +443,11 @@ public:
         uint32_t millisNow = millis();
 
         // clear();
+
         bool contentDrawn = false;
         for (const auto& sc : screenContents) {
             if (sc.offsetFrom.atMs <= millisNow && sc.offsetTo.atMs >= millisNow) {
+                // printf("!!!\n");
 
                 int now = (millisNow - sc.offsetFrom.atMs);
                 int total = (sc.offsetTo.atMs - sc.offsetFrom.atMs);
