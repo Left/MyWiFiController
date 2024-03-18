@@ -589,8 +589,8 @@ void setup(Sink* _sink) {
     }
 
     // msBeforeRestart = atoi(secondsBeforeRestart.value());
-    wifiName.setValue(SSID_STRING);
-    wifiPwd.setValue(PASS_STRING);
+    // wifiName.setValue(SSID_STRING);
+    // wifiPwd.setValue(PASS_STRING);
 
 
     debugSerial->println(String(F("Initialized in ")) + String(millis() - was, DEC));
@@ -717,106 +717,149 @@ uint32_t oldStatus = WiFi.status();
 uint32_t nextReconnect = millis();
 uint32_t nextWiFiScan = millis();
 
+bool inAPMode = false;
+int connectingAttempts = 5;
+
 void loop() {
     if (millis() - lastLoop > 50) {
          debugSerial->println(String(F("Long loop: ")) + String(millis() - lastLoop, DEC));
     }
     lastLoop = millis();
 
-    if (WiFi.status() != WL_CONNECTED && (millis() > nextReconnect)) {
-        debugSerial->println(String(F("WiFi.status() check: ")) + WiFi.status());
-        bool ret = WiFi.reconnect();
-        debugSerial->println(String(F("Reconnect returned ")) + String(ret, DEC));
-        nextReconnect = millis() + (ret ? 4000 : 300);
-    }
-
-    if (millis() > nextWiFiScan) {
-        debugSerial->println(String(F("Start scanning")));
-        WiFi.scanNetworks(true);
-
-        nextWiFiScan = millis() + 600000; // Scan every 10 seconds
-    }
-
-    int n = WiFi.scanComplete();
-    if(n >= 0) {
-        debugSerial->println(String(F("------------")));
-        debugSerial->printf("%d network(s) found\n", n);
-        for (int i = 0; i < n; i++) {
-            debugSerial->printf("%d: %s, Ch:%d (%ddBm) %s\n", i+1, WiFi.SSID(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), WiFi.encryptionType(i) == ENC_TYPE_NONE ? "open" : "");
-        }
-        WiFi.scanDelete();
-        debugSerial->println(String(F("------------")));
-    }
-
-    if (oldStatus != WiFi.status()) {
-        oldStatus = WiFi.status();
-        debugSerial->println(String(F("WiFi.status(): ")) + oldStatus);
-
-        if (WiFi.status() == WL_IDLE_STATUS || WiFi.status() == WL_DISCONNECTED) {
-            debugSerial->println(String(F("Reconnecting")));
-            reconnectWebsocketAt = 0x7FFFFFFF;
-            WiFi.reconnect();
-        }
-
-        if (WiFi.status() == WL_CONNECTED) {
-            debugSerial->println(String(F("Connected to WiFi, IP:")) + WiFi.localIP().toString());
-
-            udpClient.begin(atoi(sceleton::websocketPort.value()) + 1);
-
-            reconnectWebsocketAt = millis() + 3000; // Wait 1000 ms and connect to websocket
-
-            ArduinoOTA.setPort(8266);
-
-            // set host name
-            ArduinoOTA.setHostname(deviceName.value());
-
-            ArduinoOTA.onStart([]() {
-                // debugSerial->println("Start OTA");  //  "Начало OTA-апдейта"
-                // debugSerial->println("Updating...");
-            });
-            ArduinoOTA.onEnd([]() {
-                // debugSerial->println("End OTA");  //  "Завершение OTA-апдейта"
-                // debugSerial->println("Done...");
-            });
-            ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-                // debugSerial->printf("Progress: %u%%\r", (progress / (total / 100)));
-                //  debugSerial->printf("Progress %d/%d\n", progress, total);
-            });
-            ArduinoOTA.onError([](ota_error_t error) {
-                debugSerial->printf("Error[%u]: ", error);
-                if (error == OTA_AUTH_ERROR) {
-                    // debugSerial->println("Auth Failed");
-                    //  "Ошибка при аутентификации"
-                } else if (error == OTA_BEGIN_ERROR) {
-                    // debugSerial->println("Begin Failed"); 
-                    //  "Ошибка при начале OTA-апдейта"
-                } else if (error == OTA_CONNECT_ERROR) {
-                    // debugSerial->println("Connect Failed");
-                    //  "Ошибка при подключении"
-                } else if (error == OTA_RECEIVE_ERROR) {
-                    // debugSerial->println("Receive Failed");
-                    //  "Ошибка при получении данных"
-                } else if (error == OTA_END_ERROR) {
-                    // debugSerial->println("End Failed");
-                    //  "Ошибка при завершении OTA-апдейта"
+    if (rebootAt == 0x7FFFFFFF) {
+        if (WiFi.status() != WL_CONNECTED) {
+            if (connectingAttempts > 0) {
+                if (millis() > nextReconnect) {
+                    debugSerial->println(String(F("WiFi.status() check: ")) + WiFi.status());
+                    bool ret = WiFi.reconnect();
+                    connectingAttempts--;
+                    debugSerial->println(String(F("Reconnect returned ")) + String(ret, DEC));
+                    nextReconnect = millis() + (ret ? 4000 : 300);
                 }
-            });
+            } else {
+                if (millis() > nextWiFiScan) {
+                    debugSerial->println(String(F("Start scanning")));
+                    WiFi.scanNetworks(true);
 
-            ArduinoOTA.begin(false); // Begin OTA immediately
-            initializedWiFi = true;
+                    nextWiFiScan = millis() + 15000; // Scan every 15 seconds
+                }
+            }
+        }
 
-            // Let's say hello and show all we can
-            sendHelloMsg();
+        int n = WiFi.scanComplete();
+        if(n >= 0) {
+            debugSerial->println(String(F("------------")));
+            debugSerial->printf("%d network(s) found\n", n);
+            bool foundOurs = false;
+            for (int i = 0; i < n; i++) {
+                debugSerial->printf("%d: %s, Ch:%d (%ddBm) %s\n", i+1, WiFi.SSID(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), WiFi.encryptionType(i) == ENC_TYPE_NONE ? "open" : "");
 
-            debugSerial->println(String(F("Hello sent")));
+                foundOurs = foundOurs || WiFi.SSID(i) == wifiName.value();
+            }
+            WiFi.scanDelete();
+            debugSerial->println(String(F("------------")));
+
+            if (foundOurs) {
+                // OK, we've found wifi network we wanted. Let's try to connect
+                WiFi.mode(WIFI_STA);
+                WiFi.hostname(String(F("ESP_")) + deviceName.value());
+                inAPMode = false;
+                connectingAttempts = 5;
+                WiFi.begin(wifiName.value(), wifiPwd.value());
+
+                debugSerial->println(String(F("Found our SSID, trying to connect")));
+                return;
+            }
+
+            if (inAPMode == false && connectingAttempts <= 0) {
+                WiFi.mode(WIFI_AP);
+
+                String chidIp = String(ESP.getChipId(), HEX);
+                String wifiAPName = ("ESP") + chidIp; // + String(millis() % 0xffff, HEX)
+                String wifiPwd = String("pass") + chidIp;
+                WiFi.softAP(wifiAPName.c_str(), wifiPwd.c_str(), 3); // , millis() % 5 + 1
+                // WiFi.softAPConfig(IPAddress(192, 168, 4, 22), IPAddress(192, 168, 4, 9), IPAddress(255, 255, 255, 0));
+
+                IPAddress accessIP = WiFi.softAPIP();
+                debugSerial->println(String("ESP AccessPoint name       : ") + wifiAPName);
+                debugSerial->println(String("ESP AccessPoint password   : ") + wifiPwd);
+                debugSerial->println(String("ESP AccessPoint IP address : ") + accessIP.toString());
+
+                // WiFi.softAP(ap_ssid, ap_password, 1, false, 3);
+                inAPMode = true;
+            }
+        }
+
+        if (oldStatus != WiFi.status()) {
+            oldStatus = WiFi.status();
+            debugSerial->println(String(F("WiFi.status(): ")) + oldStatus);
+
+    /*
+            if (WiFi.status() == WL_IDLE_STATUS || WiFi.status() == WL_DISCONNECTED) {
+                debugSerial->println(String(F("Reconnecting")));
+                reconnectWebsocketAt = 0x7FFFFFFF;
+                WiFi.reconnect();
+            }
+    */
+
+            if (WiFi.status() == WL_CONNECTED) {
+                debugSerial->println(String(F("Connected to WiFi, IP:")) + WiFi.localIP().toString());
+
+                udpClient.begin(atoi(sceleton::websocketPort.value()) + 1);
+
+                reconnectWebsocketAt = millis() + 3000; // Wait 1000 ms and connect to websocket
+
+                ArduinoOTA.setPort(8266);
+
+                // set host name
+                ArduinoOTA.setHostname(deviceName.value());
+
+                ArduinoOTA.onStart([]() {
+                    // debugSerial->println("Start OTA");  //  "Начало OTA-апдейта"
+                    // debugSerial->println("Updating...");
+                });
+                ArduinoOTA.onEnd([]() {
+                    // debugSerial->println("End OTA");  //  "Завершение OTA-апдейта"
+                    // debugSerial->println("Done...");
+                });
+                ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+                    // debugSerial->printf("Progress: %u%%\r", (progress / (total / 100)));
+                    //  debugSerial->printf("Progress %d/%d\n", progress, total);
+                });
+                ArduinoOTA.onError([](ota_error_t error) {
+                    debugSerial->printf("Error[%u]: ", error);
+                    if (error == OTA_AUTH_ERROR) {
+                        // debugSerial->println("Auth Failed");
+                        //  "Ошибка при аутентификации"
+                    } else if (error == OTA_BEGIN_ERROR) {
+                        // debugSerial->println("Begin Failed"); 
+                        //  "Ошибка при начале OTA-апдейта"
+                    } else if (error == OTA_CONNECT_ERROR) {
+                        // debugSerial->println("Connect Failed");
+                        //  "Ошибка при подключении"
+                    } else if (error == OTA_RECEIVE_ERROR) {
+                        // debugSerial->println("Receive Failed");
+                        //  "Ошибка при получении данных"
+                    } else if (error == OTA_END_ERROR) {
+                        // debugSerial->println("End Failed");
+                        //  "Ошибка при завершении OTA-апдейта"
+                    }
+                });
+
+                ArduinoOTA.begin(false); // Begin OTA immediately
+                initializedWiFi = true;
+
+                // Let's say hello and show all we can
+                sendHelloMsg();
+
+                debugSerial->println(String(F("Hello sent")));
+            }
         }
     }
 
-
-    if (initializedWiFi) {
-        if (rebootAt <= millis()) {
-            sink->reboot();
-        }
+    if (rebootAt <= millis()) {
+        sink->reboot();
+        return;
     }
 
     if (saveBrightnessAt < millis()) {
