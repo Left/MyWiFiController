@@ -6,7 +6,16 @@
 #include <Arduino.h>
 #include <FS.h>
 #include <ArduinoJson.h>
+
+#if defined(ESP8266)
 #include <ESP8266WiFi.h>
+#elif defined(ESP32)
+#include <WiFi.h>
+#include "SPIFFS.h"
+#else
+#error "This ain't a ESP8266 or ESP32, dumbo!"
+#endif
+
 #include <ESPAsyncWebServer.h>
 #include <WiFiUDP.h>
 #include <ArduinoOTA.h>
@@ -22,6 +31,14 @@ Stream* debugSerial;
 
 void debugPrint(const String& str);
 
+#if defined(ESP8266)
+const char* sfname = "settings.json";
+#elif defined(ESP32)
+const char* sfname = "/settings.json";
+uint64_t micros64() {
+    return esp_timer_get_time();
+}
+#endif
 
 namespace sceleton {
 int64_t noWifiAt = 0xfffffffffffffff;
@@ -68,12 +85,18 @@ String fileToString(const String& fileName) {
 }
 
 const char* typeKey = "type";
-const uint32_t firmwareVersion[] = { 0, 23, 0 };
+const uint32_t firmwareVersion[] = { 0, 24, 0 };
 
 std::auto_ptr<AsyncWebServer> setupServer;
 // std::auto_ptr<WebSocketsClient> webSocketClient;
 
+#if defined(ESP8266)
 const int dpin[] = { D0, D1, D2, D3, D4, D5, D6, D7, D8, D9 };
+#elif defined(ESP32)
+const int dpin[] = { }; // TODO: put some pins here?
+#else
+#error "This ain't a ESP8266 or ESP32, dumbo!"
+#endif
 
 long vccVal = 0;
 uint32_t rebootAt = 0x7FFFFFFF;
@@ -184,12 +207,31 @@ public:
 
 // #define PASS_STRING TO_STR(SSID_PASS)
 // #define SSID_STRING TO_STR(SSID_NAME)
-#define PASS_STRING "MuKnefd7"
-#define SSID_STRING "Beeline_2G_FF24F3"
 
-DevParam deviceName("device.name", "name", "Device Name", String("ESP_") + ESP.getChipId());
+#define PASS_STRING "---"
+#define SSID_STRING "---"
+
+
+#if defined(ESP8266)
+uint32_t getChipId() {
+    return ESP.getChipId();
+}
+#elif defined(ESP32)
+uint32_t getChipId() {
+    uint32_t chipId = 0;
+    for(int i=0; i<17; i=i+8) {
+	  chipId |= ((ESP.getEfuseMac() >> (40 - i)) & 0xff) << i;
+	}
+    return chipId;
+}
+#else
+#error "This ain't a ESP8266 or ESP32, dumbo!"
+#endif
+
+
+DevParam deviceName("device.name", "name", "Device Name", String("ESP_") + getChipId());
 //DevParam deviceName("device.name", "name", "Device Name", String("RelayOnKitchen"));
-DevParam deviceNameRussian("device.name.russian", "rname", "Device Name (russian)", String("ESP_") + ESP.getChipId());
+DevParam deviceNameRussian("device.name.russian", "rname", "Device Name (russian)", String("ESP_") + getChipId());
 //DevParam deviceNameRussian("device.name.russian", "rname", "Device Name (russian)", String("Реле на кухне"));
 DevParam wifiName("wifi.name", "wifi", "WiFi SSID", SSID_STRING);
 DevParam wifiPwd("wifi.pwd", "wfpwd", "WiFi Password", PASS_STRING, true);
@@ -475,12 +517,6 @@ void reportRelayState(uint32_t id) {
     // send(String(F("{ \"type\": \"relayState\", \"id\": ")) + String(id, DEC) + F(", \"value\":") + (sink->relayState(id) ? F("true") : F("false")) + F(" }"));
 }
 
-void onDisconnect(const WiFiEventStationModeDisconnected& event) {
-    noWifiAt = micros64();
-    // debugSerial->println("WiFi On Disconnect.");
-    // debugSerial->println(event.reason);
-}
-
 String encodeRGBWString(Sink* sink) {
     String res = "";
     for (uint32_t k = 0; k < sink->getLedStripeLen(); ++k) {
@@ -516,7 +552,7 @@ void saveSettings() {
 
     debugSerial->println(String(F("Settings:\n")) + String(buf) + F("\n\n"));
 
-    File f = SPIFFS.open("settings.json", "w");
+    File f = SPIFFS.open(sfname, "w");
     f.write((uint8_t*)buf, sz);
     f.flush();
     f.close();
@@ -554,15 +590,18 @@ class DummySerial: public Stream {
     virtual int peek() { return -1; }
 };
 
+bool inAPMode = false;
+
 void setup(Sink* _sink) {
     sink = _sink;
     // Serial1.setDebugOutput(true);
     Serial1.begin(2000000);
     // Serial.begin(2000000);
-    SPIFFS.begin();
-
+    
     HardwareSerial* ds = &Serial;
     ds->begin(460800);
+
+    SPIFFS.begin();
 
     debugSerial = ds;
     debugSerial->println(F("\n\n====================="));
@@ -570,7 +609,7 @@ void setup(Sink* _sink) {
     long was = millis();
 
     {   // Read initial settings
-        String readVal = fileToString("settings.json");
+        String readVal = fileToString(sfname);
         StaticJsonDocument<2000> jsonBuffer;
         // debugSerial->println(readVal);
         DeserializationError error = deserializeJson(jsonBuffer, readVal.c_str(), readVal.length());
@@ -600,48 +639,48 @@ void setup(Sink* _sink) {
     WiFi.persistent(false);
     WiFi.setAutoConnect(false);
     WiFi.setAutoReconnect(false);
+
+#if defined(ESP8266)
     WiFi.setPhyMode(WIFI_PHY_MODE_11G);
     WiFi.setSleepMode(WIFI_NONE_SLEEP);
+#endif
 
     noWifiAt = 0xfffffffffffffff;
 
-    if (String(wifiName.value()).length() > 0 && String(wifiPwd.value()).length() > 0) {
-        WiFi.onStationModeConnected([=](const WiFiEventStationModeConnected& e) {
-            debugSerial->println(F("onStationModeConnected"));
-            debugSerial->println(e.ssid);
-            // debugSerial->println(e.bssid);
-            debugSerial->println(e.channel);
-            noWifiAt = 0xfffffffffffffff;
-        });
-        WiFi.onStationModeDisconnected([=](const WiFiEventStationModeDisconnected& e) {
-            debugSerial->println(F("onStationModeDisconnected"));
-            noWifiAt = micros64();
-        });
-        WiFi.onStationModeAuthModeChanged([=](const WiFiEventStationModeAuthModeChanged& e) {
-            debugSerial->println(F("onStationModeAuthModeChanged"));
-        });
-        WiFi.onStationModeGotIP([=](const WiFiEventStationModeGotIP& e) {
-            debugSerial->println(F("onStationModeGotIP"));
-        });
-        WiFi.onStationModeDHCPTimeout([=](void) {
-            debugSerial->println(F("onStationModeDHCPTimeout"));
-        });
-        WiFi.onSoftAPModeStationConnected([=](const WiFiEventSoftAPModeStationConnected& e) {
-            debugSerial->println(F("onSoftAPModeStationConnected"));
-        });
-        WiFi.onSoftAPModeStationDisconnected([=](const WiFiEventSoftAPModeStationDisconnected& e) {
-            debugSerial->println(F("onSoftAPModeStationDisconnected"));
-        });
-        WiFi.onSoftAPModeProbeRequestReceived([=](const WiFiEventSoftAPModeProbeRequestReceived& e) {
-            debugSerial->println(F("onSoftAPModeProbeRequestReceived"));
-        });
-
-        WiFi.mode(WIFI_STA);
-        WiFi.hostname(String(F("ESP_")) + deviceName.value());
-        WiFi.onStationModeDisconnected(onDisconnect);
-        WiFi.begin(wifiName.value(), wifiPwd.value());
-        // WiFi.waitForConnectResult();
+#if defined(ESP8266)
+    WiFi.onStationModeConnected([=](const WiFiEventStationModeConnected& e) {
+#elif defined(ESP32)
+    WiFi.onEvent([=](arduino_event_id_t event, arduino_event_info_t info) {
+        auto& e = info.wifi_sta_connected;
+#endif
+        debugSerial->println(F("onStationModeConnected"));
+        // debugSerial->println((const char *) e.ssid);
+        // debugSerial->println(e.bssid);
+        debugSerial->println(e.channel);
+        noWifiAt = 0xfffffffffffffff;
     }
+#if defined(ESP32)
+    , ARDUINO_EVENT_WIFI_STA_CONNECTED
+#endif
+    );
+#if defined(ESP8266)
+    WiFi.onStationModeDisconnected([=](const WiFiEventStationModeDisconnected& e) {
+#elif defined(ESP32)
+    WiFi.onEvent([=](arduino_event_id_t event, arduino_event_info_t info) {
+        auto& e = info.wifi_sta_disconnected;
+#endif
+        debugSerial->println(F("onStationModeDisconnected"));
+        noWifiAt = micros64();
+    }
+#if defined(ESP32)
+    , ARDUINO_EVENT_WIFI_STA_DISCONNECTED
+#endif
+    );
+
+    debugSerial->println(F("WiFi.mode(WIFI_STA);"));
+    WiFi.mode(WIFI_STA);
+    WiFi.hostname(String(F("ESP_")) + deviceName.value());
+    WiFi.begin(wifiName.value(), wifiPwd.value());
 
 /*
     if (WiFi.status() == WL_CONNECTED) {
@@ -717,8 +756,7 @@ uint32_t oldStatus = WiFi.status();
 uint32_t nextReconnect = millis();
 uint32_t nextWiFiScan = millis();
 
-bool inAPMode = false;
-int connectingAttempts = 5;
+int connectingAttempts = 2;
 
 void loop() {
     if (millis() - lastLoop > 50) {
@@ -734,7 +772,7 @@ void loop() {
                     bool ret = WiFi.reconnect();
                     connectingAttempts--;
                     debugSerial->println(String(F("Reconnect returned ")) + String(ret, DEC));
-                    nextReconnect = millis() + (ret ? 4000 : 300);
+                    nextReconnect = millis() + (ret ? 12000 : 300);
                 }
             } else {
                 if (millis() > nextWiFiScan) {
@@ -752,7 +790,7 @@ void loop() {
             debugSerial->printf("%d network(s) found\n", n);
             bool foundOurs = false;
             for (int i = 0; i < n; i++) {
-                debugSerial->printf("%d: %s, Ch:%d (%ddBm) %s\n", i+1, WiFi.SSID(i).c_str(), WiFi.channel(i), WiFi.RSSI(i), WiFi.encryptionType(i) == ENC_TYPE_NONE ? "open" : "");
+                debugSerial->printf("%d: %s, Ch:%d (%ddBm)\n", i+1, WiFi.SSID(i).c_str(), WiFi.channel(i), WiFi.RSSI(i));
 
                 foundOurs = foundOurs || WiFi.SSID(i) == wifiName.value();
             }
@@ -761,6 +799,7 @@ void loop() {
 
             if (foundOurs) {
                 // OK, we've found wifi network we wanted. Let's try to connect
+                debugSerial->println(String(F("WiFi.mode(WIFI_STA);")));
                 WiFi.mode(WIFI_STA);
                 WiFi.hostname(String(F("ESP_")) + deviceName.value());
                 inAPMode = false;
@@ -772,9 +811,10 @@ void loop() {
             }
 
             if (inAPMode == false && connectingAttempts <= 0) {
+                debugSerial->println(String(F("WiFi.mode(WIFI_AP);")));
                 WiFi.mode(WIFI_AP);
 
-                String chidIp = String(ESP.getChipId(), HEX);
+                String chidIp = String(getChipId(), HEX);
                 String wifiAPName = ("ESP") + chidIp; // + String(millis() % 0xffff, HEX)
                 String wifiPwd = String("pass") + chidIp;
                 WiFi.softAP(wifiAPName.c_str(), wifiPwd.c_str(), 3); // , millis() % 5 + 1
@@ -846,7 +886,12 @@ void loop() {
                     }
                 });
 
+#if defined(ESP8266)
                 ArduinoOTA.begin(false); // Begin OTA immediately
+#elif defined(ESP32)
+                ArduinoOTA.begin(); // Begin OTA immediately
+#endif
+                
                 initializedWiFi = true;
 
                 // Let's say hello and show all we can
@@ -870,10 +915,13 @@ void loop() {
         lastPing = millis();
 
         udpSend([=](Msg& msg) {}); // Simple UDP packet send, no data!
-        // debugPrint("Sent ping");
     }
 
-    auto bytesInUdbBuf = udpClient.parsePacket();
+    int bytesInUdbBuf = 0;
+    if (initializedWiFi) {
+        bytesInUdbBuf = udpClient.parsePacket();
+    }
+
     if (bytesInUdbBuf > 0) {
         // debugSerial->println("RECEIVED UDP " + String(bytesInUdbBuf, DEC));
         buffer.resize(bytesInUdbBuf + 1, 0);

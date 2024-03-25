@@ -16,6 +16,11 @@
 #include "lcd.h"
 #endif
 
+#if defined(ESP32)
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h"
+#endif
+
 #include "ledStripe.h"
 #include <SoftwareSerial.h>
 
@@ -60,9 +65,11 @@ int64_t lastIRChange = 0;
 int32_t lastIRChangeMs = 0;
 std::vector<uint32_t> ir;
 
-static void ICACHE_RAM_ATTR irIRQHandler() { 
+static void IRAM_ATTR irIRQHandler() { 
     unsigned long m = micros();
-    ir.push_back(m - lastIRChange);
+    if (ir.size() < 248) {
+        ir.push_back(m - lastIRChange);
+    }
     lastIRChange = m;
     lastIRChangeMs = millis();
 }
@@ -135,9 +142,9 @@ uint32_t ssdPins[] = {D1, D7, D5, D6};
 LedStripe* ledStripe = NULL;
 uint32_t lastLedStripeUpdate = 0;
 
-void ICACHE_RAM_ATTR handleInterruptD7() { interruptCounterD7++; }
-void ICACHE_RAM_ATTR handleInterruptD2() { interruptCounterD2++; }
-void ICACHE_RAM_ATTR handleInterruptD5() { interruptCounterD5++; }
+void IRAM_ATTR handleInterruptD7() { interruptCounterD7++; }
+void IRAM_ATTR handleInterruptD2() { interruptCounterD2++; }
+void IRAM_ATTR handleInterruptD5() { interruptCounterD5++; }
 
 uint32_t d7start;
 uint32_t d7changes;
@@ -163,7 +170,7 @@ uint32_t hcsrStart = micros();
 uint32_t hcsrDist = 0;
 uint32_t hcsrDistTime = 0;
 
-void ICACHE_RAM_ATTR handleInterruptHCSRfall() {
+void IRAM_ATTR handleInterruptHCSRfall() {
     if (hcsrDist == 0 && hcsrStart != 0) {
         hcsrDist = micros() - hcsrStart;
         hcsrDistTime = millis();
@@ -332,6 +339,11 @@ std::unique_ptr<uart::Sender> bpSender;
 std::unique_ptr<uart::Receiver> bpReceiver;
 
 void setup() {
+#if defined(ESP32)
+    // Disable brown
+    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
+#endif
+
     class SinkImpl : public sceleton::Sink {
        private:
         int currRelayState;  // All relays are off by default
@@ -522,7 +534,8 @@ void setup() {
     }
 
     if (sceleton::hasIrReceiver.isSet()) {
-       attachInterrupt(digitalPinToInterrupt(D2), irIRQHandler, CHANGE);
+        ir.reserve(250);
+        attachInterrupt(digitalPinToInterrupt(D2), irIRQHandler, CHANGE);
     }
 
     if (sceleton::hasDS18B20.isSet()) {
@@ -620,9 +633,10 @@ void setup() {
     }
 
     if (sceleton::hasPWMOnD0.isSet()) {
+#if defined(ESP8266)
         analogWriteFreq(21000);
         analogWriteRange(1024);
-
+#endif
         pinMode(D3, OUTPUT);
         pinMode(D4, OUTPUT);
         pinMode(D7, OUTPUT);
@@ -716,18 +730,14 @@ void loop() {
     }
     lastLoop = millis();
 
-    if (sceleton::noWifiAt != 0xfffffffffffffff && micros64() - sceleton::noWifiAt > 15000000) {
-        // 5 seconds w/o wifi, reboot
-        debugSerial->println("5 seconds wo wifi, ESP.reset");
-        ESP.reset();
-        ESP.restart();
-    }
 
     uint32_t st = millis();
 
     if (restartAt < st) {
         // debugSerial->println("ESP.reset");
+#if defined(ESP8266)
         ESP.reset();
+#endif
         ESP.restart();
     }
 
@@ -847,7 +857,7 @@ void loop() {
 
 #ifndef ESP01
     if (screenController != NULL) {
-        if (millis() > (lastScreenRefresh + 20)) {
+        if (millis() > (lastScreenRefresh + 25)) {
             lastScreenRefresh = millis();
             screen.clear();
 
@@ -870,7 +880,7 @@ void loop() {
                 screen.clear();
                 screen.set(0, 0,
                            OnePixelAt(Rectangle(0, 0, 32, 8),
-                                      (millis() / 30) % (32 * 8)),
+                                      (millis() / 25) % (32 * 8)),
                            true);
                 screenController->refreshAll();
             }
